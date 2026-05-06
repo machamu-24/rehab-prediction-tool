@@ -347,6 +347,21 @@ export type PatientInputs = {
   fugl_meyer_lower?: number;
   moca_score?: number;
   trunk_control?: number;
+  // 追加評価項目（論文対応）
+  knee_extension_paretic?: number;   // 麻痺側膝伸展筋力 (Nm/kg)
+  knee_extension_nonparetic?: number; // 非麻痺側膝伸展筋力 (Nm/kg)
+  knee_extension_total?: number;     // 両側合計膝伸展筋力 (Nm/kg)
+  fbs_score?: number;                // Functional Balance Scale (0-56)
+  cba_score?: number;                // Cognitive Behavioral Assessment (0-30)
+  rising_from_bed?: 0 | 1 | 2;      // 起居動作 (0=自立, 1=監視, 2=介助)
+  tug_time?: number;                 // Timed Up and Go (秒)
+  fma_lower?: number;                // Fugl-Meyer Assessment 下肢 (0-34)
+  brs_lower?: number;                // Brunnstrom Recovery Stage 下肢 (1-6)
+  delta_bbs?: number;                // BBS変化量（入院→現在）
+  delta_fim_motor?: number;          // FIM運動変化量（入院→現在）
+  unilateral_spatial_neglect?: 0 | 1; // 半側空間無視 (0=なし, 1=あり)
+  cognitive_impairment?: 0 | 1;      // 認知障害 (0=なし, 1=あり)
+  care_level?: number;               // 要介護区分 (0-5)
   [key: string]: unknown;
 };
 
