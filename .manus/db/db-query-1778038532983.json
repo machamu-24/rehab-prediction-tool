@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `prediction_results` (`id` int AUTO_INCREMENT NOT NULL, `predictionId` int NOT NULL, `ruleId` int NOT NULL, `ruleName` varchar(256) NOT NULL, `isApplicable` boolean NOT NULL, `unavailableReason` text, `isPositive` boolean, `prediction` text, `probability` float, `details` json, `createdAt` timestamp NOT NULL DEFAULT now(), CONSTRAINT `prediction_results_id` PRIMARY KEY(`id`))",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user be8d9Vojcy3K3Cc.ff2a3e4e4a36 --database nYTb2pe8M2svoEgPnzuLWN --execute CREATE TABLE `prediction_results` (`id` int AUTO_INCREMENT NOT NULL, `predictionId` int NOT NULL, `ruleId` int NOT NULL, `ruleName` varchar(256) NOT NULL, `isApplicable` boolean NOT NULL, `unavailableReason` text, `isPositive` boolean, `prediction` text, `probability` float, `details` json, `createdAt` timestamp NOT NULL DEFAULT now(), CONSTRAINT `prediction_results_id` PRIMARY KEY(`id`))",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1621
+}

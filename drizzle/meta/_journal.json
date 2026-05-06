@@ -1,5 +1,27 @@
 {
   "version": "7",
   "dialect": "mysql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1778038332771,
+      "tag": "0000_groovy_morg",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1778038486233,
+      "tag": "0001_heavy_omega_red",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1778038744812,
+      "tag": "0002_wealthy_red_wolf",
+      "breakpoints": true
+    }
+  ]
 }

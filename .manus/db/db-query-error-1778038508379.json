@@ -1,0 +1,18 @@
+{
+  "query": "CREATE TABLE `literature_rules` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`outcomeId` int NOT NULL,\n\t`name` varchar(256) NOT NULL,\n\t`ruleType` enum('cutoff','decision_tree','regression') NOT NULL,\n\t`source` varchar(512) NOT NULL,\n\t`sourceUrl` varchar(1024),\n\t`evidenceLevel` enum('Systematic Review','RCT','Cohort Study','Case-Control','Expert Classification','Other') NOT NULL DEFAULT 'Cohort Study',\n\t`applyConditions` json DEFAULT ('[]'),\n\t`ruleDefinition` json NOT NULL,\n\t`accuracy` float,\n\t`sensitivity` float,\n\t`specificity` float,\n\t`auc` float,\n\t`consensusEligible` boolean NOT NULL DEFAULT true,\n\t`isActive` boolean NOT NULL DEFAULT true,\n\t`sortOrder` int NOT NULL DEFAULT 0,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `literature_rules_id` PRIMARY KEY(`id`)\n)",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user be8d9Vojcy3K3Cc.ff2a3e4e4a36 --database nYTb2pe8M2svoEgPnzuLWN --execute CREATE TABLE `literature_rules` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`outcomeId` int NOT NULL,\n\t`name` varchar(256) NOT NULL,\n\t`ruleType` enum('cutoff','decision_tree','regression') NOT NULL,\n\t`source` varchar(512) NOT NULL,\n\t`sourceUrl` varchar(1024),\n\t`evidenceLevel` enum('Systematic Review','RCT','Cohort Study','Case-Control','Expert Classification','Other') NOT NULL DEFAULT 'Cohort Study',\n\t`applyConditions` json DEFAULT ('[]'),\n\t`ruleDefinition` json NOT NULL,\n\t`accuracy` float,\n\t`sensitivity` float,\n\t`specificity` float,\n\t`auc` float,\n\t`consensusEligible` boolean NOT NULL DEFAULT true,\n\t`isActive` boolean NOT NULL DEFAULT true,\n\t`sortOrder` int NOT NULL DEFAULT 0,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `literature_rules_id` PRIMARY KEY(`id`)\n)",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 9 column 38 near \"'[]'),",
+    "\t`ruleDefinition` json NOT NULL,",
+    "\t`accuracy` float,",
+    "\t`sensitivity` float,",
+    "\t`specificity` float,",
+    "\t`auc` float,",
+    "\t`consensusEligible` boolean NOT NULL DEFAULT true,",
+    "\t`isActive` boolean NOT NULL DEFAULT true,",
+    "\t`sortOrder` int NOT NULL DEFAULT 0,",
+    "\t`createdAt` timestamp NOT NULL DEFAULT (now()),",
+    "\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIM"
+  ]
+}

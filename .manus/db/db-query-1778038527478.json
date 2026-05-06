@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `predictions` (`id` int AUTO_INCREMENT NOT NULL, `patientInputs` json NOT NULL, `outcomeId` int NOT NULL, `consensusScore` float, `consensusLabel` varchar(64), `actualOutcome` json, `outcomeRecordedAt` timestamp NULL, `notes` text, `createdAt` timestamp NOT NULL DEFAULT now(), `updatedAt` timestamp NOT NULL DEFAULT now(), CONSTRAINT `predictions_id` PRIMARY KEY(`id`))",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user be8d9Vojcy3K3Cc.ff2a3e4e4a36 --database nYTb2pe8M2svoEgPnzuLWN --execute CREATE TABLE `predictions` (`id` int AUTO_INCREMENT NOT NULL, `patientInputs` json NOT NULL, `outcomeId` int NOT NULL, `consensusScore` float, `consensusLabel` varchar(64), `actualOutcome` json, `outcomeRecordedAt` timestamp NULL, `notes` text, `createdAt` timestamp NOT NULL DEFAULT now(), `updatedAt` timestamp NOT NULL DEFAULT now(), CONSTRAINT `predictions_id` PRIMARY KEY(`id`))",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1658
+}

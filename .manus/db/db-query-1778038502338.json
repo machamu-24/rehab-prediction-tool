@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `outcomes` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`name` varchar(128) NOT NULL,\n\t`description` text,\n\t`unit` varchar(64),\n\t`positiveLabel` varchar(128) NOT NULL DEFAULT '自立',\n\t`negativeLabel` varchar(128) NOT NULL DEFAULT '非自立',\n\t`isDefault` boolean NOT NULL DEFAULT false,\n\t`sortOrder` int NOT NULL DEFAULT 0,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `outcomes_id` PRIMARY KEY(`id`)\n)",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user be8d9Vojcy3K3Cc.ff2a3e4e4a36 --database nYTb2pe8M2svoEgPnzuLWN --execute CREATE TABLE `outcomes` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`name` varchar(128) NOT NULL,\n\t`description` text,\n\t`unit` varchar(64),\n\t`positiveLabel` varchar(128) NOT NULL DEFAULT '自立',\n\t`negativeLabel` varchar(128) NOT NULL DEFAULT '非自立',\n\t`isDefault` boolean NOT NULL DEFAULT false,\n\t`sortOrder` int NOT NULL DEFAULT 0,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `outcomes_id` PRIMARY KEY(`id`)\n)",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 2014
+}
