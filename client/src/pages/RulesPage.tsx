@@ -168,6 +168,43 @@ const RULE_DEFINITION_TEMPLATES: Record<string, string> = {
   }, null, 2),
 };
 
+type ConditionOperator = "<=" | ">=" | "<" | ">" | "==" | "!=";
+
+type ApplyConditionForm = {
+  field: string;
+  label: string;
+  operator: ConditionOperator;
+  value: string;
+};
+
+const APPLY_CONDITION_OPERATORS: { value: string; label: string }[] = [
+  { value: "<=", label: "≤ 以下" },
+  { value: ">=", label: "≥ 以上" },
+  { value: "<",  label: "< 未満" },
+  { value: ">",  label: "> 超" },
+  { value: "==", label: "= 等しい" },
+  { value: "!=", label: "≠ 等しくない" },
+];
+
+const PATIENT_FIELD_OPTIONS = [
+  { value: "days_post_stroke",       label: "発症日数" },
+  { value: "age",                    label: "年齢" },
+  { value: "sex",                    label: "性別" },
+  { value: "stroke_type",            label: "病型" },
+  { value: "nihss",                  label: "NIHSS" },
+  { value: "mmse_score",             label: "MMSE" },
+  { value: "moca_score",             label: "MoCA" },
+  { value: "tct_score",              label: "TCT" },
+  { value: "bbs_score",              label: "BBS" },
+  { value: "motricity_index_lower",  label: "MI下肢" },
+  { value: "fugl_meyer_lower",       label: "Fugl-Meyer下肢" },
+  { value: "sitting_balance_30s",    label: "座位保持30秒" },
+  { value: "walk_speed_10m",         label: "10m歩行速度" },
+  { value: "fim_motor",              label: "FIM運動" },
+  { value: "fim_cognitive",          label: "FIM認知" },
+  { value: "fim_total",              label: "FIM合計" },
+] as const;
+
 type RuleForm = {
   outcomeId: string;
   name: string;
@@ -176,6 +213,7 @@ type RuleForm = {
   sourceUrl: string;
   evidenceLevel: string;
   ruleDefinition: string;
+  applyConditions: ApplyConditionForm[];
   accuracy: string;
   sensitivity: string;
   specificity: string;
@@ -193,6 +231,7 @@ const defaultForm: RuleForm = {
   sourceUrl: "",
   evidenceLevel: "Cohort Study",
   ruleDefinition: RULE_DEFINITION_TEMPLATES["cutoff"],
+  applyConditions: [],
   accuracy: "",
   sensitivity: "",
   specificity: "",
@@ -269,6 +308,7 @@ export default function RulesPage() {
 
   const openEdit = (r: LiteratureRule & { ruleDefinition?: unknown; applyConditions?: unknown }) => {
     setEditTarget(r);
+    const rawConds = Array.isArray(r.applyConditions) ? r.applyConditions as Array<Record<string, string>> : [];
     setForm({
       outcomeId: r.outcomeId.toString(),
       name: r.name,
@@ -277,6 +317,12 @@ export default function RulesPage() {
       sourceUrl: r.sourceUrl ?? "",
       evidenceLevel: r.evidenceLevel,
       ruleDefinition: JSON.stringify(r.ruleDefinition ?? {}, null, 2),
+      applyConditions: rawConds.map((c) => ({
+        field: c.field ?? "",
+        label: c.label ?? "",
+        operator: (c.operator ?? ">=") as ConditionOperator,
+        value: String(c.value ?? ""),
+      })),
       accuracy: r.accuracy?.toString() ?? "",
       sensitivity: r.sensitivity?.toString() ?? "",
       specificity: r.specificity?.toString() ?? "",
@@ -321,7 +367,12 @@ export default function RulesPage() {
       source: form.source,
       sourceUrl: form.sourceUrl || undefined,
       evidenceLevel: form.evidenceLevel as "Systematic Review" | "RCT" | "Cohort Study" | "Case-Control" | "Expert Classification" | "Other",
-      applyConditions: [],
+      applyConditions: form.applyConditions.map((c) => ({
+        field: c.field,
+        label: c.label || (PATIENT_FIELD_OPTIONS.find((f) => f.value === c.field)?.label ?? c.field),
+        operator: c.operator,
+        value: isNaN(Number(c.value)) ? c.value : Number(c.value),
+      })),
       ruleDefinition: JSON.parse(form.ruleDefinition),
       accuracy: form.accuracy ? Number(form.accuracy) : null,
       sensitivity: form.sensitivity ? Number(form.sensitivity) : null,
@@ -451,9 +502,10 @@ export default function RulesPage() {
           </DialogHeader>
 
           <Tabs defaultValue="basic" className="mt-2">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="basic">基本情報</TabsTrigger>
               <TabsTrigger value="definition">ルール定義</TabsTrigger>
+              <TabsTrigger value="conditions">適用条件</TabsTrigger>
               <TabsTrigger value="accuracy">精度指標</TabsTrigger>
             </TabsList>
 
@@ -551,6 +603,99 @@ export default function RulesPage() {
                   <Label className="text-sm">有効</Label>
                 </div>
               </div>
+            </TabsContent>
+
+            {/* 適用条件タブ */}
+            <TabsContent value="conditions" className="space-y-3 mt-4">
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                <Info className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                <div className="text-xs text-amber-700">
+                  <p className="font-medium mb-1">適用条件（前提条件）</p>
+                  <p>このルールが適用されるための前提条件を設定します。例：「発症日数 ≤ 7」を設定すると、発症7日以内の患者にのみ適用されます。</p>
+                </div>
+              </div>
+              {form.applyConditions.map((cond, idx) => (
+                <div key={idx} className="flex items-end gap-2 p-3 border rounded-lg bg-muted/30">
+                  <div className="flex-1 space-y-1">
+                    <Label className="text-xs">フィールド</Label>
+                    <Select
+                      value={cond.field}
+                      onValueChange={(v) => setForm((f) => ({
+                        ...f,
+                        applyConditions: f.applyConditions.map((c, i) => i === idx ? { ...c, field: v } : c),
+                      }))}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="項目を選択" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PATIENT_FIELD_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-28 space-y-1">
+                    <Label className="text-xs">演算子</Label>
+                    <Select
+                      value={cond.operator}
+                      onValueChange={(v) => setForm((f) => ({
+                        ...f,
+                        applyConditions: f.applyConditions.map((c, i) => i === idx ? { ...c, operator: v as ConditionOperator } : c),
+                      }))}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {APPLY_CONDITION_OPERATORS.map((op) => (
+                          <SelectItem key={op.value} value={op.value}>{op.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-24 space-y-1">
+                    <Label className="text-xs">値</Label>
+                    <Input
+                      className="h-8 text-xs"
+                      placeholder="例: 7"
+                      value={cond.value}
+                      onChange={(e) => setForm((f) => ({
+                        ...f,
+                        applyConditions: f.applyConditions.map((c, i) => i === idx ? { ...c, value: e.target.value } : c),
+                      }))}
+                    />
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
+                    onClick={() => setForm((f) => ({
+                      ...f,
+                      applyConditions: f.applyConditions.filter((_, i) => i !== idx),
+                    }))}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-2"
+                onClick={() => setForm((f) => ({
+                  ...f,
+                  applyConditions: [...f.applyConditions, { field: "days_post_stroke", label: "", operator: "<=" as ConditionOperator, value: "7" }],
+                }))}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                条件を追加
+              </Button>
+              {form.applyConditions.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-4">
+                  適用条件なし（全患者に適用）
+                </p>
+              )}
             </TabsContent>
 
             {/* ルール定義タブ */}
