@@ -42,7 +42,7 @@ const decisionTreeRule = {
   source: "Veerbeek et al. (2011)",
   sourceUrl: null,
   evidenceLevel: "Systematic Review",
-  applyConditions: [{ field: "days_post_stroke", operator: "<=", value: 3 }],
+  applyConditions: [{ field: "days_since_onset", operator: "<=", value: 3 }],
   ruleDefinition: {
     type: "decision_tree",
     nodes: [
@@ -165,7 +165,7 @@ describe("ruleEngine - カットオフルール", () => {
 describe("ruleEngine - 決定木ルール（時期依存）", () => {
   it("発症3日以内・座位保持あり・MI下肢>=25 のとき陽性を返す", () => {
     const inputs: PatientInputs = {
-      days_post_stroke: 2,
+      days_since_onset: 2,
       sitting_balance_30s: true,
       motricity_index_lower: 30,
     };
@@ -176,7 +176,7 @@ describe("ruleEngine - 決定木ルール（時期依存）", () => {
 
   it("発症3日以内・座位保持なし のとき陰性を返す", () => {
     const inputs: PatientInputs = {
-      days_post_stroke: 2,
+      days_since_onset: 2,
       sitting_balance_30s: false,
       motricity_index_lower: 0, // 座位保持なしの場合、MI下肢は評価されないが入力自体は必要
     };
@@ -187,7 +187,7 @@ describe("ruleEngine - 決定木ルール（時期依存）", () => {
 
   it("発症10日後は時期条件を満たさず適用不可を返す", () => {
     const inputs: PatientInputs = {
-      days_post_stroke: 10,
+      days_since_onset: 10,
       sitting_balance_30s: true,
       motricity_index_lower: 50,
     };

@@ -329,7 +329,7 @@ export type CustomFormulaRuleDefinition = {
 export type PatientInputs = {
   age?: number;
   sex?: "男性" | "女性";
-  days_post_stroke?: number;
+  days_since_onset?: number;
   stroke_type?: string;
   nihss?: number;
   tct_score?: number;

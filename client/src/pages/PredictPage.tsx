@@ -45,12 +45,12 @@ const PATIENT_FIELDS: SectionDef[] = [
   { section: "基本情報", fields: [
     { key: "age",              label: "年齢",         type: "number", unit: "歳",  placeholder: "例: 72" },
     { key: "sex",              label: "性別",         type: "select", options: ["男性", "女性"] },
-    { key: "days_post_stroke", label: "発症日数",     type: "number", unit: "日",  placeholder: "例: 14" },
+    { key: "days_since_onset", label: "発症後日数",   type: "number", unit: "日",  placeholder: "例: 14" },
     { key: "stroke_type",      label: "病型",         type: "select", options: ["脳梗塞", "脳出血", "くも膜下出血", "その他"] },
   ]},
   { section: "神経学的評価", fields: [
     { key: "nihss",               label: "NIHSS",                    type: "number", unit: "点",  placeholder: "0〜42" },
-    { key: "mmse",                label: "MMSE",                     type: "number", unit: "点",  placeholder: "0〜30" },
+    { key: "mmse_score",          label: "MMSE",                     type: "number", unit: "点",  placeholder: "0〜30" },
     { key: "moca_score",          label: "MoCA",                     type: "number", unit: "点",  placeholder: "0〜30" },
     { key: "spatial_neglect",     label: "半側空間無視（USN）あり",  type: "boolean" },
     { key: "cognitive_impairment",label: "認知障害あり",             type: "boolean" },
@@ -62,11 +62,9 @@ const PATIENT_FIELDS: SectionDef[] = [
     { key: "fbs_score",              label: "FBS（Functional Balance Scale）",   type: "number", unit: "点",  placeholder: "0〜28" },
     { key: "motricity_index_lower",  label: "Motricity Index 下肢",             type: "number", unit: "点",  placeholder: "0〜100" },
     { key: "fugl_meyer_lower",       label: "Fugl-Meyer 下肢（FMA-LE）",        type: "number", unit: "点",  placeholder: "0〜34" },
-    { key: "fma_lower",              label: "FMA 下肢（別名）",                 type: "number", unit: "点",  placeholder: "0〜34" },
     { key: "brunnstrom_lower",       label: "Brunnstrom Stage 下肢",            type: "number", unit: "ステージ", placeholder: "1〜6" },
     { key: "trunk_control",          label: "体幹機能スコア",                   type: "number", unit: "点",  placeholder: "0〜100" },
-    { key: "sitting_balance_30s",    label: "座位保持30秒",                     type: "boolean" },
-    { key: "sitting_balance",        label: "座位保持（良好）",                 type: "boolean" },
+    { key: "sitting_balance_30s",    label: "座位保持30秒（30秒以上）",         type: "boolean" },
     { key: "sit_up_independent",     label: "起居動作（介助不要）",             type: "boolean" },
     { key: "leg_strength_good",      label: "下肢筋力（良好）",                 type: "boolean" },
     { key: "knee_ext_paretic_nm_kg", label: "麻痺側膝伸展筋力（Nm/kg）",       type: "number", unit: "Nm/kg", placeholder: "例: 0.45" },
@@ -81,8 +79,6 @@ const PATIENT_FIELDS: SectionDef[] = [
   { section: "ADL評価（FIM）", fields: [
     { key: "fim_motor_total",    label: "FIM 運動項目合計",  type: "number", unit: "点",  placeholder: "13〜91" },
     { key: "fim_cognitive_total",label: "FIM 認知項目合計",  type: "number", unit: "点",  placeholder: "5〜35" },
-    { key: "fim_motor",          label: "FIM 運動（別名）",  type: "number", unit: "点",  placeholder: "13〜91" },
-    { key: "fim_cognitive",      label: "FIM 認知（別名）",  type: "number", unit: "点",  placeholder: "5〜35" },
     { key: "fim_total",          label: "FIM 合計",          type: "number", unit: "点",  placeholder: "18〜126" },
     { key: "adl_independence",   label: "ADL自立（良好）",   type: "boolean" },
   ]},
@@ -96,8 +92,9 @@ const PATIENT_FIELDS: SectionDef[] = [
     { key: "diabetes",                label: "糖尿病",                  type: "boolean" },
   ]},
   { section: "変化量（入棟1ヶ月後評価）", fields: [
-    { key: "delta_bbs",       label: "ΔBBS（入棟時→1ヶ月後）",      type: "number", unit: "点", placeholder: "例: 8" },
-    { key: "delta_fim_motor", label: "ΔFIM運動（入棟時→1ヶ月後）",  type: "number", unit: "点", placeholder: "例: 12" },
+    { key: "delta_bbs",           label: "ΔBBS（入棟時→1ヶ月後）",      type: "number", unit: "点", placeholder: "例: 8" },
+    { key: "delta_fim_motor",     label: "ΔFIM運動（入棟時→1ヶ月後）",  type: "number", unit: "点", placeholder: "例: 12" },
+    { key: "delta_fim_cognitive", label: "ΔFIM認知（入棟時→1ヶ月後）",  type: "number", unit: "点", placeholder: "例: 3" },
   ]},
 ];
 

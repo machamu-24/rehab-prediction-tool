@@ -81,7 +81,7 @@ const ruleSchema = z.object({
 const patientInputsSchema = z.object({
   age: z.number().optional(),
   sex: z.enum(["男性", "女性"]).optional(),
-  days_post_stroke: z.number().optional(),
+  days_since_onset: z.number().optional(),
   stroke_type: z.string().optional(),
   nihss: z.number().optional(),
   tct_score: z.number().optional(),
@@ -322,7 +322,7 @@ export const appRouter = router({
             p.outcomeId,
             inp.age ?? "",
             inp.sex ?? "",
-            inp.days_post_stroke ?? "",
+            inp.days_since_onset ?? "",
             inp.nihss ?? "",
             inp.tct_score ?? "",
             inp.bbs_score ?? "",
