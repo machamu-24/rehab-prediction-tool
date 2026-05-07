@@ -42,3 +42,18 @@
 - [x] 患者情報フォームに起居動作フィールドを追加する（自立/監視/介助）
 - [x] ruleEngine.tsの必要フィールドリストを新フィールドに対応させる
 - [x] 動作確認・GitHubプッシュ・チェックポイント保存
+## バグ修正（2026-05-07）
+- [x] 「Cannot read properties of undefined (reading 'filter')」エラーの原因特定
+- [x] ID 30006・30007（decision_tree）のruleDefinitionをnodes配列形式に変換・DB更新
+- [x] ID 60007・60008（composite_rule）のruleDefinitionをroot形式に変換・DB更新
+- [x] ruleEngine.tsにnodes/root未定義時の防御コードを追加
+- [x] storageProxy.tsのTypeScriptエラー修正（req.params[0]型問題）
+- [x] 全18テストパス確認・GitHubプッシュ・チェックポイント保存
+
+## バグ修正（2026-05-07）
+- [x] Cannot read properties of undefined (reading filter) エラーの原因特定
+- [x] ID 30006・30007（decision_tree）のruleDefinitionをnodes配列形式に変換・DB更新
+- [x] ID 60007・60008（composite_rule）のruleDefinitionをroot形式に変換・DB更新
+- [x] ruleEngine.tsにnodes/root未定義時の防御コードを追加
+- [x] storageProxy.tsのTypeScriptエラー修正
+- [x] 全18テストパス確認・GitHubプッシュ・チェックポイント保存

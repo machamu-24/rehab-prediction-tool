@@ -141,6 +141,7 @@ function extractRequiredFields(def: RuleDefinition): string[] {
       return fields;
     }
     case "decision_tree": {
+      if (!Array.isArray(def.nodes)) return [];
       const fieldSet = new Set(def.nodes.filter((n) => !n.isLeaf).map((n) => n.field));
       return Array.from(fieldSet);
     }
@@ -151,6 +152,7 @@ function extractRequiredFields(def: RuleDefinition): string[] {
     case "nomogram":
       return def.variables.map((v) => v.field);
     case "composite_rule":
+      if (!def.root) return [];
       return extractFieldsFromLogicNode(def.root);
     case "custom_formula":
       return def.variables.map((v) => v.field);
@@ -203,6 +205,9 @@ function evalCutoff(def: CutoffRuleDefinition, inputs: PatientInputs): EvalResul
 
 // ---- 2. 決定木 ----
 function evalDecisionTree(def: DecisionTreeRuleDefinition, inputs: PatientInputs): EvalResult {
+  if (!Array.isArray(def.nodes) || def.nodes.length === 0) {
+    return { isPositive: false, prediction: "評価不能（ノード定義なし）", probability: null, details: [] };
+  }
   const nodeMap = new Map<string, DecisionTreeNode>(def.nodes.map((n) => [n.id, n]));
   const rootNode = def.nodes[0];
   if (!rootNode) {
@@ -308,6 +313,9 @@ function evalNomogram(def: NomogramRuleDefinition, inputs: PatientInputs): EvalR
 // ---- 6. 複合条件ルール ----
 function evalCompositeRule(def: CompositeRuleDefinition, inputs: PatientInputs): EvalResult {
   const details: string[] = [];
+  if (!def.root) {
+    return { isPositive: false, prediction: "評価不能（ルート条件未定義）", probability: null, details };
+  }
   const isPositive = evalLogicNode(def.root, inputs, details);
   return { isPositive, prediction: isPositive ? def.positiveMessage : def.negativeMessage, probability: null, details };
 }
