@@ -536,9 +536,9 @@ export default function RulesPage() {
                       </div>
                     )}
                     <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-muted-foreground">
-                      {r.accuracy    && <span>正確度: <strong>{(r.accuracy * 100).toFixed(0)}%</strong></span>}
-                      {r.sensitivity && <span>感度: <strong>{(r.sensitivity * 100).toFixed(0)}%</strong></span>}
-                      {r.specificity && <span>特異度: <strong>{(r.specificity * 100).toFixed(0)}%</strong></span>}
+                      {r.accuracy    && <span>正確度: <strong>{Number(r.accuracy).toFixed(1)}%</strong></span>}
+                      {r.sensitivity && <span>感度: <strong>{Number(r.sensitivity).toFixed(1)}%</strong></span>}
+                      {r.specificity && <span>特異度: <strong>{Number(r.specificity).toFixed(1)}%</strong></span>}
                       {r.auc         && <span>AUC: <strong>{r.auc.toFixed(2)}</strong></span>}
                       {r.sourceUrl && (
                         <a href={r.sourceUrl} target="_blank" rel="noopener noreferrer"

@@ -246,9 +246,9 @@ function RuleResultCard({ result }: { result: RuleResult }) {
             {/* 精度指標 */}
             {(result.accuracy || result.sensitivity || result.specificity || result.auc) && (
               <div className="flex flex-wrap gap-3 text-xs">
-                {result.accuracy    && <span className="text-muted-foreground">正確度: <strong>{(result.accuracy * 100).toFixed(0)}%</strong></span>}
-                {result.sensitivity && <span className="text-muted-foreground">感度: <strong>{(result.sensitivity * 100).toFixed(0)}%</strong></span>}
-                {result.specificity && <span className="text-muted-foreground">特異度: <strong>{(result.specificity * 100).toFixed(0)}%</strong></span>}
+                {result.accuracy    && <span className="text-muted-foreground">正確度: <strong>{Number(result.accuracy).toFixed(1)}%</strong></span>}
+                {result.sensitivity && <span className="text-muted-foreground">感度: <strong>{Number(result.sensitivity).toFixed(1)}%</strong></span>}
+                {result.specificity && <span className="text-muted-foreground">特異度: <strong>{Number(result.specificity).toFixed(1)}%</strong></span>}
                 {result.auc         && <span className="text-muted-foreground">AUC: <strong>{result.auc.toFixed(2)}</strong></span>}
               </div>
             )}
