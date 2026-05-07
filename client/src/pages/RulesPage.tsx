@@ -40,8 +40,58 @@ import {
   Plus,
   Trash2,
   Info,
+  ClipboardList,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { toast } from "sonner";
+
+// フォームのフィールドキー→日本語ラベルのマップ
+const FIELD_LABEL_MAP: Record<string, string> = {
+  age: "年齢",
+  sex: "性別",
+  days_since_onset: "発症後日数",
+  days_post_stroke: "発症後日数",
+  stroke_type: "病型",
+  mmse_score: "MMSE",
+  moca_score: "MoCA",
+  spatial_neglect: "半側空間無視（USN）",
+  cognitive_impairment: "認知障害",
+  sias_visuospatial: "SIAS 視空間認知",
+  tct_score: "TCT",
+  bbs_score: "BBS / FBS",
+  fbs_score: "BBS / FBS",
+  motricity_index_lower: "MI 下肢",
+  fugl_meyer_lower: "Fugl-Meyer 下肢",
+  brunnstrom_lower: "Brunnstrom Stage 下肢",
+  trunk_control: "体幹機能スコア",
+  sitting_balance_30s: "座位保持30秒",
+  sit_up_independent: "起居動作（介助不要）",
+  leg_strength_good: "下肢筋力（良好）",
+  knee_ext_paretic_nm_kg: "麻痺側膝伸展筋力",
+  knee_ext_total_nm_kg: "両側合計膝伸展筋力",
+  cba_score: "CBA",
+  walk_speed_10m: "10m歩行速度",
+  tug_seconds: "TUG",
+  walking_status: "歩行状態",
+  fim_motor_total: "FIM 運動",
+  fim_cognitive_total: "FIM 認知",
+  fim_total: "FIM 合計",
+  adl_independence: "ADL自立",
+  care_level: "要介護区分",
+  days_onset_to_admission: "発症〜入院日数",
+  caregiver_available: "介護者あり",
+  continence: "失禁なし",
+  cortical_lesion: "皮質病変なし",
+  diabetes: "糖尿病",
+  delta_bbs: "ΔBBS",
+  delta_fim_motor: "ΔFIM運動",
+  delta_fim_cognitive: "ΔFIM認知",
+  nihss: "NIHSS",
+};
+function fieldLabel(field: string): string {
+  return FIELD_LABEL_MAP[field] ?? field;
+}
 
 const RULE_TYPE_OPTIONS = [
   { value: "cutoff",         label: "カットオフ値",     desc: "単一または複合のカットオフ値による判定" },
@@ -459,6 +509,32 @@ export default function RulesPage() {
                       {!r.consensusEligible && <Badge variant="outline" className="text-xs text-amber-700 border-amber-300">コンセンサス除外</Badge>}
                     </div>
                     <p className="text-sm text-muted-foreground mt-1 truncate">{r.source}</p>
+                    {/* 必要な評価項目表示 */}
+                    {("requiredFields" in r) && (r as { requiredFields?: string[] }).requiredFields && (r as { requiredFields?: string[] }).requiredFields!.length > 0 && (
+                      <div className="mt-2">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <ClipboardList className="h-3.5 w-3.5 text-blue-600" />
+                          <span className="text-xs font-medium text-blue-700">必要な評価項目</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {(r as { requiredFields?: string[] }).requiredFields!.map((f) => (
+                            <span key={f} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                              {fieldLabel(f)}
+                            </span>
+                          ))}
+                          {("applyConditionFields" in r) && (r as { applyConditionFields?: Array<{field: string; label: string}> }).applyConditionFields && (r as { applyConditionFields?: Array<{field: string; label: string}> }).applyConditionFields!.length > 0 && (
+                            <>
+                              <span className="inline-flex items-center px-1.5 py-0.5 text-xs text-muted-foreground">適用条件:</span>
+                              {(r as { applyConditionFields?: Array<{field: string; label: string}> }).applyConditionFields!.map((c) => (
+                                <span key={c.field} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                  {c.label}
+                                </span>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-muted-foreground">
                       {r.accuracy    && <span>正確度: <strong>{(r.accuracy * 100).toFixed(0)}%</strong></span>}
                       {r.sensitivity && <span>感度: <strong>{(r.sensitivity * 100).toFixed(0)}%</strong></span>}

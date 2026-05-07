@@ -131,8 +131,12 @@ function checkApplyConditions(
 }
 
 /**
- * ルール定義から必要フィールドを抽出する
+ * ルール定義から必要フィールドを抽出する（外部公開用ラッパー）
  */
+export function extractRequiredFieldsFromDef(def: RuleDefinition | null | undefined): string[] {
+  if (!def) return [];
+  return extractRequiredFields(def);
+}
 function extractRequiredFields(def: RuleDefinition): string[] {
   switch (def.type) {
     case "cutoff": {

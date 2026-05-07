@@ -49,7 +49,6 @@ const PATIENT_FIELDS: SectionDef[] = [
     { key: "stroke_type",      label: "病型",         type: "select", options: ["脳梗塞", "脳出血", "くも膜下出血", "その他"] },
   ]},
   { section: "神経学的評価", fields: [
-    { key: "nihss",               label: "NIHSS",                    type: "number", unit: "点",  placeholder: "0〜42" },
     { key: "mmse_score",          label: "MMSE",                     type: "number", unit: "点",  placeholder: "0〜30" },
     { key: "moca_score",          label: "MoCA",                     type: "number", unit: "点",  placeholder: "0〜30" },
     { key: "spatial_neglect",     label: "半側空間無視（USN）あり",  type: "boolean" },
@@ -58,8 +57,7 @@ const PATIENT_FIELDS: SectionDef[] = [
   ]},
   { section: "運動機能評価", fields: [
     { key: "tct_score",              label: "TCT（体幹コントロールテスト）",      type: "number", unit: "点",  placeholder: "0〜100" },
-    { key: "bbs_score",              label: "BBS（Berg Balance Scale）",         type: "number", unit: "点",  placeholder: "0〜56" },
-    { key: "fbs_score",              label: "FBS（Functional Balance Scale）",   type: "number", unit: "点",  placeholder: "0〜28" },
+    { key: "bbs_score",              label: "BBS / FBS（Berg / Functional Balance Scale）", type: "number", unit: "点",  placeholder: "0〜56" },
     { key: "motricity_index_lower",  label: "Motricity Index 下肢",             type: "number", unit: "点",  placeholder: "0〜100" },
     { key: "fugl_meyer_lower",       label: "Fugl-Meyer 下肢（FMA-LE）",        type: "number", unit: "点",  placeholder: "0〜34" },
     { key: "brunnstrom_lower",       label: "Brunnstrom Stage 下肢",            type: "number", unit: "ステージ", placeholder: "1〜6" },
@@ -87,7 +85,6 @@ const PATIENT_FIELDS: SectionDef[] = [
     { key: "days_onset_to_admission", label: "発症から入院までの日数",  type: "number", unit: "日",  placeholder: "例: 14" },
     { key: "caregiver_available",     label: "介護者あり",              type: "boolean" },
     { key: "continence",              label: "失禁なし",                type: "boolean" },
-    { key: "neglect",                 label: "無視なし",                type: "boolean" },
     { key: "cortical_lesion",         label: "皮質病変なし",            type: "boolean" },
     { key: "diabetes",                label: "糖尿病",                  type: "boolean" },
   ]},

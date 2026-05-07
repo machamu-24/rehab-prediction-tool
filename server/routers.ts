@@ -21,7 +21,7 @@ import {
   createPredictionResults,
   getPredictionResultsByPredictionId,
 } from "./db";
-import { runEngine } from "./ruleEngine";
+import { runEngine, extractRequiredFieldsFromDef } from "./ruleEngine";
 import type { PatientInputs, ActualOutcome } from "../drizzle/schema";
 
 // ---- Zod スキーマ ----
@@ -156,7 +156,18 @@ export const appRouter = router({
     list: publicProcedure
       .input(z.object({ outcomeId: z.number().int().optional() }))
       .query(async ({ input }) => {
-        return getAllRules(input.outcomeId);
+        const rules = await getAllRules(input.outcomeId);
+        // 各ルールの必要フィールドを抽出して返却
+        return rules.map((r) => ({
+          ...r,
+          requiredFields: extractRequiredFieldsFromDef(r.ruleDefinition),
+          applyConditionFields: Array.isArray(r.applyConditions)
+            ? (r.applyConditions as Array<{ field: string; label?: string }>).map((c) => ({
+                field: c.field,
+                label: c.label ?? c.field,
+              }))
+            : [],
+        }));
       }),
 
     get: publicProcedure
