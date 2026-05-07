@@ -160,12 +160,14 @@ export const appRouter = router({
         // 各ルールの必要フィールドを抽出して返却
         return rules.map((r) => ({
           ...r,
-          requiredFields: extractRequiredFieldsFromDef(r.ruleDefinition),
+          requiredFields: Array.from(new Set(extractRequiredFieldsFromDef(r.ruleDefinition))),
           applyConditionFields: Array.isArray(r.applyConditions)
-            ? (r.applyConditions as Array<{ field: string; label?: string }>).map((c) => ({
-                field: c.field,
-                label: c.label ?? c.field,
-              }))
+            ? (r.applyConditions as Array<{ field: string; label?: string }>)
+                .filter((c, i, arr) => arr.findIndex((x) => x.field === c.field) === i)
+                .map((c) => ({
+                  field: c.field,
+                  label: c.label ?? c.field,
+                }))
             : [],
         }));
       }),
