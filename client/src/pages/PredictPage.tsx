@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -24,6 +24,39 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+
+// 3状態トグルコンポーネント（未評価 / あり / なし）
+function TriStateToggle({
+  value,
+  onChange,
+}: {
+  value: boolean | undefined;
+  onChange: (v: boolean | undefined) => void;
+}) {
+  const states: { label: string; val: boolean | undefined; activeClass: string }[] = [
+    { label: "未評価", val: undefined, activeClass: "bg-muted text-muted-foreground border-border" },
+    { label: "あり",   val: true,      activeClass: "bg-emerald-500 text-white border-emerald-500" },
+    { label: "なし",   val: false,     activeClass: "bg-red-400 text-white border-red-400" },
+  ];
+  return (
+    <div className="flex rounded-md border border-border overflow-hidden text-xs font-medium">
+      {states.map((s) => (
+        <button
+          key={String(s.val)}
+          type="button"
+          onClick={() => onChange(s.val)}
+          className={`px-3 py-1.5 transition-colors border-r last:border-r-0 border-border ${
+            value === s.val
+              ? s.activeClass
+              : "bg-background text-muted-foreground hover:bg-muted/60"
+          }`}
+        >
+          {s.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 type PatientInputs = Record<string, string | number | boolean | undefined>;
 
@@ -377,9 +410,9 @@ export default function PredictPage() {
                   <div key={field.key} className="flex items-center gap-3">
                     <Label className="text-sm w-44 shrink-0 leading-tight">{field.label}</Label>
                     {field.type === "boolean" ? (
-                      <Switch
-                        checked={Boolean(inputs[field.key])}
-                        onCheckedChange={(v) => handleInputChange(field.key, v)}
+                      <TriStateToggle
+                        value={inputs[field.key] as boolean | undefined}
+                        onChange={(v) => handleInputChange(field.key, v)}
                       />
                     ) : field.type === "select" ? (
                       <Select
