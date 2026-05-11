@@ -100,17 +100,53 @@ pnpm dev
 
 ### 環境変数の設定
 
-`.env` ファイルに以下の変数を設定する。
+`.env.example` はセキュリティ上リポジトリに含めていないため、以下の内容で手動作成する。
 
-```env
+```bash
+# Mac / Linux
+cat > .env << 'EOF'
 # データベース接続文字列（MySQL）
-DATABASE_URL=mysql://user:password@host:3306/dbname
+DATABASE_URL=mysql://root:password@localhost:3306/rehab_db
 
-# セッション署名用シークレット（任意の文字列）
-JWT_SECRET=your-secret-key
+# セッションCookie署名用シークレット（32文字以上推奨）
+# 生成例: openssl rand -hex 32
+JWT_SECRET=change-me-to-a-random-string
+
+# サーバー設定
+NODE_ENV=development
+PORT=3000
+
+# Manus OAuth（Manusプラットフォーム上で動かす場合のみ必要。ローカル開発時は空のままで可）
+VITE_APP_ID=
+OAUTH_SERVER_URL=
+VITE_OAUTH_PORTAL_URL=
+OWNER_OPEN_ID=
+BUILT_IN_FORGE_API_URL=
+BUILT_IN_FORGE_API_KEY=
+VITE_FRONTEND_FORGE_API_URL=
+VITE_FRONTEND_FORGE_API_KEY=
+EOF
 ```
 
-> **注意**: `.env` ファイルはGitにコミットしないこと。
+```powershell
+# Windows (PowerShell)
+@"
+DATABASE_URL=mysql://root:password@localhost:3306/rehab_db
+JWT_SECRET=change-me-to-a-random-string
+NODE_ENV=development
+PORT=3000
+VITE_APP_ID=
+OAUTH_SERVER_URL=
+VITE_OAUTH_PORTAL_URL=
+OWNER_OPEN_ID=
+BUILT_IN_FORGE_API_URL=
+BUILT_IN_FORGE_API_KEY=
+VITE_FRONTEND_FORGE_API_URL=
+VITE_FRONTEND_FORGE_API_KEY=
+"@ | Out-File -FilePath .env -Encoding utf8
+```
+
+> **注意**: `.env` ファイルはGitにコミットしないこと。`DATABASE_URL` はローカルのMySQL接続情報に合わせて変更すること。
 
 ---
 
