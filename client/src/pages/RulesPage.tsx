@@ -218,7 +218,7 @@ const RULE_DEFINITION_TEMPLATES: Record<string, string> = {
   }, null, 2),
 };
 
-type ConditionOperator = "<=" | ">=" | "<" | ">" | "==" | "!=";
+type ConditionOperator = "<=" | ">=" | "<" | ">" | "==" | "!=" | "boolean";
 
 type ApplyConditionForm = {
   field: string;
@@ -233,7 +233,8 @@ const APPLY_CONDITION_OPERATORS: { value: string; label: string }[] = [
   { value: "<",  label: "< 未満" },
   { value: ">",  label: "> 超" },
   { value: "==", label: "= 等しい" },
-  { value: "!=", label: "≠ 等しくない" },
+  { value: "!=",     label: "≠ 等しくない" },
+  { value: "boolean", label: "boolean（真偽値）" },
 ];
 
 const PATIENT_FIELD_OPTIONS = [

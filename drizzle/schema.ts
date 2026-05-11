@@ -150,7 +150,7 @@ export type InsertPredictionResult = typeof predictionResults.$inferInsert;
 /** 適用条件（時期・患者属性などの前提条件） */
 export type ApplyCondition = {
   field: string;
-  operator: "<=" | ">=" | "<" | ">" | "==" | "!=";
+  operator: "<=" | ">=" | "<" | ">" | "==" | "!=" | "boolean";
   value: number | string | boolean;
   /** UI表示用ラベル */
   label?: string;

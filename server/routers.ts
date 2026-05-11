@@ -28,7 +28,7 @@ import type { PatientInputs, ActualOutcome } from "../drizzle/schema";
 
 const applyConditionSchema = z.object({
   field: z.string(),
-  operator: z.enum(["<=", ">=", "<", ">", "==", "!="]),
+  operator: z.enum(["<=", ">=", "<", ">", "==", "!=", "boolean"]),
   value: z.union([z.number(), z.string(), z.boolean()]),
   label: z.string().optional(),
 });
