@@ -19,7 +19,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { getLoginUrl } from "@/const";
+import { getLoginUrl, isLoginConfigured } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   Activity,
@@ -211,13 +211,18 @@ function DashboardLayoutContent({
               </DropdownMenu>
             ) : (
               !isCollapsed && (
-                <Button
-                  size="sm"
-                  className="w-full text-xs"
-                  onClick={() => { window.location.href = getLoginUrl(); }}
-                >
-                  サインイン
-                </Button>
+                isLoginConfigured() && (
+                  <Button
+                    size="sm"
+                    className="w-full text-xs"
+                    onClick={() => {
+                      const loginUrl = getLoginUrl();
+                      if (loginUrl) window.location.href = loginUrl;
+                    }}
+                  >
+                    サインイン
+                  </Button>
+                )
               )
             )}
           </SidebarFooter>

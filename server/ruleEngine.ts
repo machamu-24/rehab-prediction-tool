@@ -89,7 +89,7 @@ function numVal(inputs: PatientInputs, field: string): number {
 function compareOp(
   val: unknown,
   operator: string,
-  threshold: number | string | undefined
+  threshold: number | string | boolean | undefined
 ): boolean {
   const n = Number(val);
   const t = Number(threshold);
@@ -98,9 +98,11 @@ function compareOp(
     case ">=": return n >= t;
     case "<":  return n < t;
     case ">":  return n > t;
+    case "equals":
     case "==": return val == threshold;
     case "!=": return val != threshold;
     case "boolean": return Boolean(val);
+    case "boolean_negative": return !Boolean(val);
     default:   return false;
   }
 }
@@ -254,8 +256,15 @@ function evalRegression(def: RegressionRuleDefinition, inputs: PatientInputs): E
       `${coef.fieldLabel}${coef.unit ? `（${coef.unit}）` : ""}: ${v} × ${coef.coefficient} = ${contrib.toFixed(3)}`
     );
   }
-  details.push(`合計スコア: ${score.toFixed(3)}（閾値: ${def.threshold}）`);
-  const isPositive = score >= def.threshold;
+  const outputRange = (def as RegressionRuleDefinition & { outputRange?: [number, number] }).outputRange;
+  const threshold =
+    typeof def.threshold === "number"
+      ? def.threshold
+      : Array.isArray(outputRange)
+        ? (outputRange[0] + outputRange[1]) / 2
+        : 0;
+  details.push(`予測値: ${score.toFixed(3)}（判定閾値: ${threshold}）`);
+  const isPositive = score >= threshold;
   return { isPositive, prediction: isPositive ? def.positiveMessage : def.negativeMessage, probability: null, details };
 }
 
@@ -303,9 +312,10 @@ function evalNomogram(def: NomogramRuleDefinition, inputs: PatientInputs): EvalR
     logOdds += v.coefficient * rawVal;
   }
   const probability = 1 / (1 + Math.exp(-logOdds));
+  const probabilityThreshold = def.probabilityThreshold ?? 0.5;
   details.push(`log-odds: ${logOdds.toFixed(4)}`);
-  details.push(`予測確率: ${(probability * 100).toFixed(1)}%（閾値: ${(def.probabilityThreshold * 100).toFixed(0)}%）`);
-  const isPositive = probability >= def.probabilityThreshold;
+  details.push(`予測確率: ${(probability * 100).toFixed(1)}%（判定閾値: ${(probabilityThreshold * 100).toFixed(0)}%）`);
+  const isPositive = probability >= probabilityThreshold;
   return {
     isPositive,
     prediction: isPositive ? def.positiveMessage : def.negativeMessage,

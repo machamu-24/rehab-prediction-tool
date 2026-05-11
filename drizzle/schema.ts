@@ -150,7 +150,7 @@ export type InsertPredictionResult = typeof predictionResults.$inferInsert;
 /** 適用条件（時期・患者属性などの前提条件） */
 export type ApplyCondition = {
   field: string;
-  operator: "<=" | ">=" | "<" | ">" | "==" | "!=" | "boolean";
+  operator: "<=" | ">=" | "<" | ">" | "==" | "!=" | "equals" | "boolean" | "boolean_negative";
   value: number | string | boolean;
   /** UI表示用ラベル */
   label?: string;
@@ -196,7 +196,7 @@ export type DecisionTreeNode = {
   id: string;
   field: string;
   fieldLabel: string;
-  operator: "<=" | ">=" | "<" | ">" | "==" | "boolean";
+  operator: "<=" | ">=" | "<" | ">" | "==" | "equals" | "boolean" | "boolean_negative";
   threshold?: number | string;
   trueNodeId?: string;
   falseNodeId?: string;
@@ -245,8 +245,8 @@ export type ScoringItem = {
   /** 区間別スコア定義 */
   bands: {
     /** 条件: operator + value で評価 */
-    operator: "<=" | ">=" | "<" | ">" | "==" | "boolean";
-    value?: number | string;
+    operator: "<=" | ">=" | "<" | ">" | "==" | "equals" | "boolean" | "boolean_negative";
+    value?: number | string | boolean;
     /** この条件を満たした場合の加算点 */
     score: number;
     label: string;
@@ -270,7 +270,7 @@ export type NomogramRuleDefinition = {
     categoryMap?: Record<string, number>;
   }[];
   /** 確率 ≥ threshold → positive（0.0〜1.0） */
-  probabilityThreshold: number;
+  probabilityThreshold?: number;
   positiveMessage: string;
   negativeMessage: string;
 };
@@ -296,8 +296,8 @@ export type LogicNode =
       logic: "CONDITION";
       field: string;
       fieldLabel: string;
-      operator: "<=" | ">=" | "<" | ">" | "==" | "!=" | "boolean";
-      value?: number | string;
+      operator: "<=" | ">=" | "<" | ">" | "==" | "!=" | "equals" | "boolean" | "boolean_negative";
+      value?: number | string | boolean;
       unit?: string;
     };
 
