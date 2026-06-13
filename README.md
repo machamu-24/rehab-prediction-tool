@@ -11,7 +11,7 @@
 |------|------|
 | **アウトカム管理** | 歩行自立・FIM・入院日数など、予測対象をUIから自由に追加・編集・削除 |
 | **文献ルール管理** | 7種類のルールタイプ（後述）に対応した文献ルールをUIから登録・編集・削除 |
-| **患者情報入力** | 年齢・性別・発症日数・NIHSS・BBS・TCT・MI下肢・歩行速度など |
+| **患者情報入力** | 年齢・性別・発症日数・NIHSS・BBS・TCT・歩行速度など |
 | **予測エンジン** | 登録された文献ルールを動的に評価し、コンセンサス分析を実施 |
 | **予測結果表示** | 個別ルール結果カード・総合コンセンサススコア・色分け表示 |
 | **時期依存ガイド** | 発症日数に応じてEPOS・TWISTなど時期限定ルールの適用可否をリアルタイム表示 |
@@ -25,7 +25,7 @@
 | タイプ | 説明 | 代表例 |
 |--------|------|--------|
 | `cutoff` | カットオフ値 | BBS ≥ 14 → 歩行自立 |
-| `decision_tree` | 決定木 | EPOSモデル（座位保持 × MI下肢） |
+| `decision_tree` | 決定木 | 座位保持 × BBS など |
 | `regression` | 重回帰式 | 退院日数の予測（BBS・FIM・年齢の線形結合） |
 | `scoring_system` | スコアリングシステム | NIHSS重症度スコア |
 | `nomogram` | ノモグラム | ロジスティック回帰ベースの確率算出 |
@@ -205,7 +205,6 @@ rehab-prediction-tool/
 | BBSカットオフ（歩行自立） | Jenkin SE et al. (2021). *Predictors of independent walking after stroke.* Physiotherapy Canada. |
 | NIHSS性別補正カットオフ | Murata Y et al. (2019). *Sex-specific NIHSS cutoff for walking independence.* J Stroke Cerebrovasc Dis. |
 | TCTカットオフ（TWIST） | Ohura T et al. (2000). *Trunk Control Test for stroke outcome prediction.* Disabil Rehabil. |
-| MI下肢カットオフ | Collin C, Wade D. (1990). *Motricity Index for stroke rehabilitation.* Clin Rehabil. |
 
 ---
 

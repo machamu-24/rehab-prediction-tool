@@ -38,6 +38,8 @@ export type RuleEvaluationResult = {
   source: string;
   sourceUrl: string | null;
   evidenceLevel: string;
+  literatureSummary: LiteratureSummary;
+  matchExplanation: string[];
   consensusEligible: boolean;
   isApplicable: boolean;
   unavailableReason: string | null;
@@ -49,6 +51,13 @@ export type RuleEvaluationResult = {
   sensitivity: number | null;
   specificity: number | null;
   auc: number | null;
+};
+
+export type LiteratureSummary = {
+  overview: string | null;
+  targetPopulation: string | null;
+  predictors: string[];
+  clinicalNote: string | null;
 };
 
 export type ConsensusAnalysis = {
@@ -171,6 +180,104 @@ function extractFieldsFromLogicNode(node: LogicNode): string[] {
   if (node.logic === "CONDITION") return [node.field];
   if (node.logic === "NOT") return extractFieldsFromLogicNode(node.child);
   return node.children.flatMap(extractFieldsFromLogicNode);
+}
+
+type RuleDefinitionMetadata = RuleDefinition & {
+  description?: unknown;
+  notes?: unknown;
+  usageExample?: unknown;
+  formula?: unknown;
+};
+
+function textOrNull(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function uniqueNonEmpty(values: string[]): string[] {
+  return Array.from(new Set(values.map((v) => v.trim()).filter(Boolean)));
+}
+
+function extractPredictorLabels(def: RuleDefinition): string[] {
+  switch (def.type) {
+    case "cutoff":
+      return uniqueNonEmpty([
+        def.fieldLabel,
+        ...(def.secondaryConditions?.map((c) => c.fieldLabel) ?? []),
+      ]);
+    case "decision_tree":
+      return uniqueNonEmpty(
+        def.nodes
+          .filter((node) => !node.isLeaf)
+          .map((node) => node.fieldLabel || node.field)
+      );
+    case "regression":
+      return uniqueNonEmpty(def.coefficients.map((coef) => coef.fieldLabel || coef.field));
+    case "scoring_system":
+      return uniqueNonEmpty(def.items.map((item) => item.fieldLabel || item.field));
+    case "nomogram":
+      return uniqueNonEmpty(def.variables.map((variable) => variable.fieldLabel || variable.field));
+    case "composite_rule":
+      return uniqueNonEmpty(extractLabelsFromLogicNode(def.root));
+    case "custom_formula":
+      return uniqueNonEmpty(def.variables.map((variable) => variable.fieldLabel || variable.field));
+    default:
+      return [];
+  }
+}
+
+function extractLabelsFromLogicNode(node: LogicNode): string[] {
+  if (node.logic === "CONDITION") return [node.fieldLabel || node.field];
+  if (node.logic === "NOT") return extractLabelsFromLogicNode(node.child);
+  return node.children.flatMap(extractLabelsFromLogicNode);
+}
+
+function buildFallbackOverview(rule: LiteratureRule, def: RuleDefinition): string {
+  switch (def.type) {
+    case "cutoff":
+      return `${def.fieldLabel}のカットオフ値を用いて、${rule.name}を判定する文献ルールです。`;
+    case "decision_tree":
+      return "複数の評価項目を順に照合する決定木型の文献ルールです。";
+    case "regression":
+      return "複数の評価項目を回帰式に代入して判定する文献ルールです。";
+    case "scoring_system":
+      return "複数の評価項目を点数化し、合計点で判定する文献ルールです。";
+    case "nomogram":
+      return "複数の評価項目から確率や時期を推定するノモグラム型の文献ルールです。";
+    case "composite_rule":
+      return "複数の条件の組み合わせで判定する文献ルールです。";
+    case "custom_formula":
+      return "文献に基づく数式を用いて判定する文献ルールです。";
+    default:
+      return "登録済み文献に基づく判定ルールです。";
+  }
+}
+
+function extractTargetPopulation(notes: string | null): { targetPopulation: string | null; clinicalNote: string | null } {
+  if (!notes) return { targetPopulation: null, clinicalNote: null };
+  const match = notes.match(/対象[:：]\s*[^。]+。?/);
+  if (!match) return { targetPopulation: null, clinicalNote: notes };
+  const targetPopulation = match[0].trim();
+  const clinicalNote = notes.replace(match[0], "").trim() || null;
+  return { targetPopulation, clinicalNote };
+}
+
+function buildLiteratureSummary(rule: LiteratureRule, def: RuleDefinition): LiteratureSummary {
+  const metadata = def as RuleDefinitionMetadata;
+  const notes = textOrNull(metadata.notes);
+  const { targetPopulation, clinicalNote } = extractTargetPopulation(notes);
+  return {
+    overview: textOrNull(metadata.description) ?? buildFallbackOverview(rule, def),
+    targetPopulation,
+    predictors: extractPredictorLabels(def),
+    clinicalNote,
+  };
+}
+
+function buildMatchExplanation(evalResult: EvalResult): string[] {
+  return [
+    ...evalResult.details,
+    `上記の照合結果から「${evalResult.prediction}」と判定されました。`,
+  ];
 }
 
 // ============================================================
@@ -485,11 +592,12 @@ function tokenize(expr: string): string[] {
 export function evaluateRule(rule: LiteratureRule, inputs: PatientInputs): RuleEvaluationResult {
   const def = rule.ruleDefinition as RuleDefinition;
   const conditions = (rule.applyConditions ?? []) as ApplyCondition[];
+  const literatureSummary = buildLiteratureSummary(rule, def);
 
   // 適用条件チェック
   const { ok, reason } = checkApplyConditions(conditions, inputs);
   if (!ok) {
-    return makeInapplicable(rule, reason);
+    return makeInapplicable(rule, literatureSummary, reason);
   }
 
   // 必要フィールドチェック
@@ -501,6 +609,7 @@ export function evaluateRule(rule: LiteratureRule, inputs: PatientInputs): RuleE
   if (missingFields.length > 0) {
     return makeInapplicable(
       rule,
+      literatureSummary,
       `必要な入力項目が未入力です: ${missingFields.join(", ")}`
     );
   }
@@ -526,6 +635,8 @@ export function evaluateRule(rule: LiteratureRule, inputs: PatientInputs): RuleE
     source: rule.source,
     sourceUrl: rule.sourceUrl ?? null,
     evidenceLevel: rule.evidenceLevel,
+    literatureSummary,
+    matchExplanation: buildMatchExplanation(evalResult),
     consensusEligible: rule.consensusEligible,
     isApplicable: true,
     unavailableReason: null,
@@ -540,7 +651,11 @@ export function evaluateRule(rule: LiteratureRule, inputs: PatientInputs): RuleE
   };
 }
 
-function makeInapplicable(rule: LiteratureRule, reason: string | null): RuleEvaluationResult {
+function makeInapplicable(
+  rule: LiteratureRule,
+  literatureSummary: LiteratureSummary,
+  reason: string | null
+): RuleEvaluationResult {
   return {
     ruleId: rule.id,
     ruleName: rule.name,
@@ -548,6 +663,8 @@ function makeInapplicable(rule: LiteratureRule, reason: string | null): RuleEval
     source: rule.source,
     sourceUrl: rule.sourceUrl ?? null,
     evidenceLevel: rule.evidenceLevel,
+    literatureSummary,
+    matchExplanation: reason ? [reason] : [],
     consensusEligible: rule.consensusEligible,
     isApplicable: false,
     unavailableReason: reason,

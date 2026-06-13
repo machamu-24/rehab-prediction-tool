@@ -135,6 +135,41 @@ const compositeRule = {
   updatedAt: new Date(),
 };
 
+const kimuraUsnCognitiveRule = {
+  id: 60008,
+  outcomeId: 1,
+  name: "半側空間無視と認知障害の複合が歩行自立回復に与える影響",
+  ruleType: "composite_rule" as const,
+  source: "Kimura Y, Yamada M et al. J Rehabil Med",
+  sourceUrl: "https://medicaljournalssweden.se/jrm/article/view/9437",
+  evidenceLevel: "Cohort Study",
+  applyConditions: [],
+  ruleDefinition: {
+    type: "composite_rule",
+    root: {
+      logic: "NOT",
+      child: {
+        logic: "AND",
+        children: [
+          { logic: "CONDITION", field: "spatial_neglect", fieldLabel: "半側空間無視", operator: "==", value: true },
+          { logic: "CONDITION", field: "mmse_score", fieldLabel: "MMSE", operator: "<", value: 24 },
+        ],
+      },
+    },
+    positiveMessage: "USN+認知障害の合併なし → 歩行自立の可能性あり",
+    negativeMessage: "USN+認知障害の合併 → 歩行自立困難リスク高",
+  },
+  accuracy: null,
+  sensitivity: null,
+  specificity: null,
+  auc: null,
+  consensusEligible: true,
+  isActive: true,
+  sortOrder: 5,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
 // ============================================================
 // テストスイート
 // ============================================================
@@ -145,6 +180,8 @@ describe("ruleEngine - カットオフルール", () => {
     const { results } = runEngine([cutoffRule], inputs);
     expect(results[0].isApplicable).toBe(true);
     expect(results[0].isPositive).toBe(true);
+    expect(results[0].literatureSummary.predictors).toContain("BBS");
+    expect(results[0].matchExplanation.join("\n")).toContain("BBS");
   });
 
   it("BBS < 14 のとき陰性を返す", () => {
@@ -246,6 +283,24 @@ describe("ruleEngine - 複合条件ルール", () => {
     const { results } = runEngine([compositeRule], inputs);
     expect(results[0].isApplicable).toBe(true);
     expect(results[0].isPositive).toBe(true);
+  });
+
+  it("Kimuraルール: USN単独では歩行自立側として扱う", () => {
+    const inputs: PatientInputs = { spatial_neglect: true, mmse_score: 28 };
+    const { results, consensus } = runEngine([kimuraUsnCognitiveRule], inputs);
+    expect(results[0].isApplicable).toBe(true);
+    expect(results[0].isPositive).toBe(true);
+    expect(results[0].prediction).toContain("歩行自立");
+    expect(consensus.label).toBe("positive");
+  });
+
+  it("Kimuraルール: USNとMMSE<24の合併では歩行自立困難側として扱う", () => {
+    const inputs: PatientInputs = { spatial_neglect: true, mmse_score: 23 };
+    const { results, consensus } = runEngine([kimuraUsnCognitiveRule], inputs);
+    expect(results[0].isApplicable).toBe(true);
+    expect(results[0].isPositive).toBe(false);
+    expect(results[0].prediction).toContain("歩行自立困難");
+    expect(consensus.label).toBe("negative");
   });
 });
 

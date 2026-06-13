@@ -249,31 +249,35 @@ const rule60007 = {
 
 // ============================================================
 // ID 60008: 半側空間無視と認知障害の複合が歩行自立回復に与える影響
-// conditions+logic形式 → root形式に変換（OR: どちらか一方でも該当→歩行困難リスク高）
+// USNと認知障害の合併のみを歩行自立困難リスク高として扱う。
+// positive=true はアプリ全体のコンセンサスに合わせて歩行自立側に揃える。
 // ============================================================
 const rule60008 = {
   type: "composite_rule",
   root: {
-    logic: "OR",
-    children: [
-      {
-        logic: "CONDITION",
-        field: "spatial_neglect",
-        fieldLabel: "半側空間無視",
-        operator: "==",
-        value: true
-      },
-      {
-        logic: "CONDITION",
-        field: "mmse_score",
-        fieldLabel: "MMSE（認知機能）",
-        operator: "<",
-        value: 24
-      }
-    ]
+    logic: "NOT",
+    child: {
+      logic: "AND",
+      children: [
+        {
+          logic: "CONDITION",
+          field: "spatial_neglect",
+          fieldLabel: "半側空間無視",
+          operator: "==",
+          value: true
+        },
+        {
+          logic: "CONDITION",
+          field: "mmse_score",
+          fieldLabel: "MMSE（認知機能）",
+          operator: "<",
+          value: 24
+        }
+      ]
+    }
   },
-  positiveMessage: "歩行自立困難リスク高（半側空間無視または認知障害あり）",
-  negativeMessage: "歩行自立可能性あり（半側空間無視なし・認知機能正常）"
+  positiveMessage: "USN+認知障害の合併なし → 歩行自立の可能性あり（USN単独では有意な関連なし）",
+  negativeMessage: "USN+認知障害の合併 → 歩行自立困難リスク高（自立率10%、OR=5.55）"
 };
 
 // DB更新

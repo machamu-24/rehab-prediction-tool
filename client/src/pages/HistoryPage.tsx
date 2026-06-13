@@ -64,9 +64,9 @@ const CONSENSUS_COLORS = {
 };
 
 const CONSENSUS_LABELS = {
-  positive: "陽性",
+  positive: "支持",
   neutral:  "中間",
-  negative: "陰性",
+  negative: "困難示唆",
 };
 
 function PredictionRow({ pred, outcomeName }: { pred: PredictionRecord; outcomeName: string }) {
@@ -97,6 +97,7 @@ function PredictionRow({ pred, outcomeName }: { pred: PredictionRecord; outcomeN
   const pct = pred.consensusScore !== null ? Math.round(pred.consensusScore * 100) : null;
 
   const inp = pred.patientInputs as Record<string, unknown>;
+  const daysSinceOnset = inp.days_since_onset ?? inp.days_post_stroke ?? inp.days_onset_to_admission;
   const ao = pred.actualOutcome as Record<string, unknown> | null;
 
   return (
@@ -123,7 +124,7 @@ function PredictionRow({ pred, outcomeName }: { pred: PredictionRecord; outcomeN
                     <span>評価日: {new Date(pred.createdAt).toLocaleDateString("ja-JP")}</span>
                     {inp.age != null && <span>年齢: {String(inp.age)}歳</span>}
                     {inp.sex != null && <span>性別: {String(inp.sex)}</span>}
-                    {inp.days_post_stroke != null && <span>発症{String(inp.days_post_stroke)}日</span>}
+                    {daysSinceOnset != null && <span>発症{String(daysSinceOnset)}日</span>}
                     {inp.nihss != null && <span>NIHSS: {String(inp.nihss)}</span>}
                   </div>
                 </div>
@@ -164,7 +165,7 @@ function PredictionRow({ pred, outcomeName }: { pred: PredictionRecord; outcomeN
               {/* ルール結果 */}
               {detail?.results && detail.results.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">ルール評価結果</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">文献ルール判定</p>
                   {(detail.results as RuleResult[]).map((r) => (
                     <div key={r.id} className={`flex items-start gap-2 text-xs p-2 rounded-md ${r.isApplicable ? (r.isPositive ? "bg-emerald-50" : "bg-red-50") : "bg-muted/50"}`}>
                       {r.isApplicable
@@ -197,7 +198,7 @@ function PredictionRow({ pred, outcomeName }: { pred: PredictionRecord; outcomeN
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>退院時実績を記録</DialogTitle>
-            <DialogDescription>予測結果との比較のため、実際のアウトカムを入力してください</DialogDescription>
+            <DialogDescription>文献照合結果との比較のため、実際のアウトカムを入力してください</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1.5">
@@ -276,8 +277,8 @@ export default function HistoryPage() {
             <History className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-xl font-bold">予測履歴</h1>
-            <p className="text-sm text-muted-foreground">過去の予測結果と退院時実績を管理します</p>
+            <h1 className="text-xl font-bold">照合履歴</h1>
+            <p className="text-sm text-muted-foreground">過去の文献照合結果と退院時実績を管理します</p>
           </div>
         </div>
         <Button variant="outline" className="gap-2" onClick={handleExportCsv} disabled={!csvData?.csv}>
@@ -291,7 +292,7 @@ export default function HistoryPage() {
         <div className="grid grid-cols-3 gap-3">
           <Card>
             <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">総予測件数</p>
+              <p className="text-xs text-muted-foreground">総照合件数</p>
               <p className="text-2xl font-bold text-primary">{predictions.length}</p>
             </CardContent>
           </Card>
@@ -305,11 +306,9 @@ export default function HistoryPage() {
           </Card>
           <Card>
             <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">陽性予測率</p>
+              <p className="text-xs text-muted-foreground">支持判定件数</p>
               <p className="text-2xl font-bold text-foreground">
-                {predictions.length > 0
-                  ? `${Math.round(predictions.filter((p) => p.consensusLabel === "positive").length / predictions.length * 100)}%`
-                  : "-"}
+                {predictions.filter((p) => p.consensusLabel === "positive").length}
               </p>
             </CardContent>
           </Card>
@@ -323,8 +322,8 @@ export default function HistoryPage() {
         <Card className="border-dashed">
           <CardContent className="py-12 text-center text-muted-foreground">
             <History className="h-10 w-10 mx-auto mb-3 opacity-30" />
-            <p>予測履歴がありません</p>
-            <p className="text-xs mt-1">予測実行ページから予測を行うと、ここに記録されます</p>
+            <p>照合履歴がありません</p>
+            <p className="text-xs mt-1">文献照合ページで照合すると、ここに記録されます</p>
           </CardContent>
         </Card>
       ) : (

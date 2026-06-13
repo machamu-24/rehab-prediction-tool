@@ -28,10 +28,13 @@ import type { PatientInputs, ActualOutcome } from "../drizzle/schema";
 
 const applyConditionSchema = z.object({
   field: z.string(),
-  operator: z.enum(["<=", ">=", "<", ">", "==", "!=", "boolean"]),
+  operator: z.enum(["<=", ">=", "<", ">", "==", "!=", "equals", "boolean", "boolean_negative"]),
   value: z.union([z.number(), z.string(), z.boolean()]),
   label: z.string().optional(),
-});
+}).transform((condition) => ({
+  ...condition,
+  operator: condition.operator === "equals" ? "==" : condition.operator,
+}));
 
 const ruleDefinitionSchema = z.any(); // 複雑な型のためanyで受け取りDB保存
 
@@ -320,7 +323,7 @@ export const appRouter = router({
         const preds = await getAllPredictions(input.limit);
         const headers = [
           "ID", "評価日時", "アウトカムID", "年齢", "性別", "発症日数",
-          "NIHSS", "TCT", "BBS", "10m速度", "MI下肢", "MMSE",
+          "NIHSS", "TCT", "BBS", "10m速度", "MMSE",
           "座位30秒", "空間無視", "介護者", "糖尿病",
           "FIM運動", "FIM認知", "FIM合計",
           "コンセンサススコア", "コンセンサスラベル",
@@ -340,7 +343,6 @@ export const appRouter = router({
             inp.tct_score ?? "",
             inp.bbs_score ?? "",
             inp.walk_speed_10m ?? "",
-            inp.motricity_index_lower ?? "",
             inp.mmse_score ?? "",
             inp.sitting_balance_30s != null ? (inp.sitting_balance_30s ? 1 : 0) : "",
             inp.spatial_neglect != null ? (inp.spatial_neglect ? 1 : 0) : "",

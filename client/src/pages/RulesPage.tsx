@@ -34,8 +34,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  AlertTriangle,
   BookOpen,
+  Calculator,
+  CheckCircle2,
   Edit2,
+  Eye,
   ExternalLink,
   Plus,
   Trash2,
@@ -57,14 +61,11 @@ const FIELD_LABEL_MAP: Record<string, string> = {
   moca_score: "MoCA",
   spatial_neglect: "半側空間無視（USN）",
   cognitive_impairment: "認知障害",
-  sias_visuospatial: "SIAS 視空間認知",
   tct_score: "TCT",
   bbs_score: "BBS / FBS",
   fbs_score: "BBS / FBS",
-  motricity_index_lower: "MI 下肢",
   fugl_meyer_lower: "Fugl-Meyer 下肢",
   brunnstrom_lower: "Brunnstrom Stage 下肢",
-  trunk_control: "体幹機能スコア",
   sitting_balance_30s: "座位保持30秒",
   sit_up_independent: "起居動作（介助不要）",
   leg_strength_good: "下肢筋力（良好）",
@@ -131,6 +132,8 @@ const RULE_TYPE_LABELS: Record<string, string> = {
   custom_formula: "カスタム数式",
 };
 
+const EASY_RULE_TYPES = new Set(["cutoff", "regression"]);
+
 // ルール定義のサンプルテンプレート
 const RULE_DEFINITION_TEMPLATES: Record<string, string> = {
   cutoff: JSON.stringify({
@@ -146,22 +149,24 @@ const RULE_DEFINITION_TEMPLATES: Record<string, string> = {
   decision_tree: JSON.stringify({
     type: "decision_tree",
     nodes: [
-      { id: "root", field: "sitting_balance_30s", fieldLabel: "座位保持30秒", operator: "boolean", trueNodeId: "check_mi", falseNodeId: "leaf_neg" },
-      { id: "check_mi", field: "motricity_index_lower", fieldLabel: "MI下肢", operator: ">=", threshold: 25, trueNodeId: "leaf_pos", falseNodeId: "leaf_neg" },
+      { id: "root", field: "sitting_balance_30s", fieldLabel: "座位保持30秒", operator: "boolean", trueNodeId: "check_bbs", falseNodeId: "leaf_neg" },
+      { id: "check_bbs", field: "bbs_score", fieldLabel: "BBS", operator: ">=", threshold: 14, trueNodeId: "leaf_pos", falseNodeId: "leaf_neg" },
       { id: "leaf_pos", isLeaf: true, isPositive: true, message: "歩行自立の可能性が高い" },
       { id: "leaf_neg", isLeaf: true, isPositive: false, message: "歩行自立は不確実" },
     ],
   }, null, 2),
   regression: JSON.stringify({
     type: "regression",
+    formula: "予測スコア = -5.2 + 0.15 * BBS + 0.08 * FIM運動 - 0.05 * 年齢",
     intercept: -5.2,
     coefficients: [
       { field: "bbs_score", fieldLabel: "BBS", coefficient: 0.15 },
       { field: "fim_motor", fieldLabel: "FIM運動", coefficient: 0.08 },
       { field: "age", fieldLabel: "年齢", coefficient: -0.05 },
     ],
-    outputUnit: "日",
-    description: "退院までの予測日数",
+    threshold: 15,
+    positiveMessage: "予測スコアが閾値以上です",
+    negativeMessage: "予測スコアが閾値未満です",
   }, null, 2),
   scoring_system: JSON.stringify({
     type: "scoring_system",
@@ -180,12 +185,12 @@ const RULE_DEFINITION_TEMPLATES: Record<string, string> = {
   nomogram: JSON.stringify({
     type: "nomogram",
     intercept: -3.5,
-    coefficients: [
+    variables: [
       { field: "age", fieldLabel: "年齢", coefficient: -0.04 },
       { field: "nihss", fieldLabel: "NIHSS", coefficient: -0.18 },
       { field: "bbs_score", fieldLabel: "BBS", coefficient: 0.12 },
     ],
-    threshold: 0.5,
+    probabilityThreshold: 0.5,
     positiveMessage: "転帰良好の確率 ≥ 50%",
     negativeMessage: "転帰良好の確率 < 50%",
   }, null, 2),
@@ -210,15 +215,19 @@ const RULE_DEFINITION_TEMPLATES: Record<string, string> = {
   custom_formula: JSON.stringify({
     type: "custom_formula",
     formula: "0.3 * bbs_score + 0.2 * tct_score - 0.1 * nihss",
+    formulaDescription: "BBS、TCT、NIHSSから予測スコアを計算",
+    variables: [
+      { field: "bbs_score", fieldLabel: "BBS", unit: "点" },
+      { field: "tct_score", fieldLabel: "TCT", unit: "点" },
+      { field: "nihss", fieldLabel: "NIHSS", unit: "点" },
+    ],
     threshold: 15,
-    operator: ">=",
-    outputLabel: "予測スコア",
     positiveMessage: "スコア ≥ 15: 良好な転帰が期待できる",
     negativeMessage: "スコア < 15: 転帰不良のリスクあり",
   }, null, 2),
 };
 
-type ConditionOperator = "<=" | ">=" | "<" | ">" | "==" | "!=" | "boolean";
+type ConditionOperator = "<=" | ">=" | "<" | ">" | "==" | "!=" | "equals" | "boolean" | "boolean_negative";
 
 type ApplyConditionForm = {
   field: string;
@@ -235,25 +244,47 @@ const APPLY_CONDITION_OPERATORS: { value: string; label: string }[] = [
   { value: "==", label: "= 等しい" },
   { value: "!=",     label: "≠ 等しくない" },
   { value: "boolean", label: "boolean（真偽値）" },
+  { value: "boolean_negative", label: "boolean（偽）" },
 ];
 
 const PATIENT_FIELD_OPTIONS = [
   { value: "days_post_stroke",       label: "発症日数" },
+  { value: "days_since_onset",       label: "発症後日数" },
+  { value: "days_onset_to_admission", label: "発症から入院までの日数" },
   { value: "age",                    label: "年齢" },
   { value: "sex",                    label: "性別" },
   { value: "stroke_type",            label: "病型" },
   { value: "nihss",                  label: "NIHSS" },
   { value: "mmse_score",             label: "MMSE" },
   { value: "moca_score",             label: "MoCA" },
+  { value: "cba_score",              label: "CBA" },
   { value: "tct_score",              label: "TCT" },
   { value: "bbs_score",              label: "BBS" },
-  { value: "motricity_index_lower",  label: "MI下肢" },
+  { value: "fbs_score",              label: "FBS" },
   { value: "fugl_meyer_lower",       label: "Fugl-Meyer下肢" },
+  { value: "brunnstrom_lower",       label: "Brunnstrom Stage 下肢" },
   { value: "sitting_balance_30s",    label: "座位保持30秒" },
+  { value: "sit_up_independent",     label: "起居動作（介助不要）" },
+  { value: "leg_strength_good",      label: "下肢筋力（良好）" },
+  { value: "knee_ext_paretic_nm_kg", label: "麻痺側膝伸展筋力" },
+  { value: "knee_ext_total_nm_kg",   label: "両側合計膝伸展筋力" },
   { value: "walk_speed_10m",         label: "10m歩行速度" },
+  { value: "tug_seconds",            label: "TUG" },
+  { value: "walking_status",         label: "歩行状態" },
   { value: "fim_motor",              label: "FIM運動" },
   { value: "fim_cognitive",          label: "FIM認知" },
+  { value: "fim_motor_total",        label: "FIM 運動項目合計" },
+  { value: "fim_cognitive_total",    label: "FIM 認知項目合計" },
   { value: "fim_total",              label: "FIM合計" },
+  { value: "adl_independence",       label: "ADL自立" },
+  { value: "care_level",             label: "要介護認定区分" },
+  { value: "caregiver_available",    label: "介護者あり" },
+  { value: "continence",             label: "失禁なし" },
+  { value: "cortical_lesion",        label: "皮質病変なし" },
+  { value: "diabetes",               label: "糖尿病" },
+  { value: "delta_bbs",              label: "ΔBBS" },
+  { value: "delta_fim_motor",        label: "ΔFIM運動" },
+  { value: "delta_fim_cognitive",    label: "ΔFIM認知" },
 ] as const;
 
 type RuleForm = {
@@ -274,6 +305,39 @@ type RuleForm = {
   sortOrder: string;
 };
 
+type CutoffBuilderForm = {
+  field: string;
+  fieldLabel: string;
+  operator: "<=" | ">=" | "<" | ">";
+  threshold: string;
+  unit: string;
+  positiveMessage: string;
+  negativeMessage: string;
+};
+
+type RegressionCoefficientForm = {
+  field: string;
+  fieldLabel: string;
+  coefficient: string;
+  unit: string;
+};
+
+type RegressionBuilderForm = {
+  formula: string;
+  intercept: string;
+  threshold: string;
+  positiveMessage: string;
+  negativeMessage: string;
+  coefficients: RegressionCoefficientForm[];
+};
+
+type RulePreview = {
+  key: string;
+  definition: Record<string, unknown>;
+  requiredFields: string[];
+  logicLines: string[];
+};
+
 const defaultForm: RuleForm = {
   outcomeId: "",
   name: "",
@@ -291,6 +355,76 @@ const defaultForm: RuleForm = {
   isActive: true,
   sortOrder: "0",
 };
+
+const defaultCutoffBuilder: CutoffBuilderForm = {
+  field: "bbs_score",
+  fieldLabel: "BBS",
+  operator: ">=",
+  threshold: "14",
+  unit: "点",
+  positiveMessage: "歩行自立の可能性が高い",
+  negativeMessage: "歩行自立は困難な可能性",
+};
+
+const defaultRegressionBuilder: RegressionBuilderForm = {
+  formula: "予測スコア = 切片 + 各係数 × 評価値",
+  intercept: "0",
+  threshold: "0",
+  positiveMessage: "予測値が閾値以上です",
+  negativeMessage: "予測値が閾値未満です",
+  coefficients: [
+    { field: "bbs_score", fieldLabel: "BBS", coefficient: "0.1", unit: "点" },
+  ],
+};
+
+function patientFieldLabel(value: string): string {
+  return PATIENT_FIELD_OPTIONS.find((f) => f.value === value)?.label ?? value;
+}
+
+function normalizeConditionOperator(operator: unknown): ConditionOperator {
+  if (operator === "equals") return "==";
+  if (
+    operator === "<=" ||
+    operator === ">=" ||
+    operator === "<" ||
+    operator === ">" ||
+    operator === "==" ||
+    operator === "!=" ||
+    operator === "boolean" ||
+    operator === "boolean_negative"
+  ) {
+    return operator;
+  }
+  return ">=";
+}
+
+function parseRequiredNumber(value: string, label: string): number {
+  const n = Number(value);
+  if (value.trim() === "" || Number.isNaN(n)) {
+    throw new Error(`${label}を数値で入力してください`);
+  }
+  return n;
+}
+
+function extractPreviewFields(def: Record<string, unknown>): string[] {
+  if (def.type === "cutoff") {
+    const fields = [String(def.field ?? "")];
+    const secondary = Array.isArray(def.secondaryConditions) ? def.secondaryConditions : [];
+    for (const cond of secondary) {
+      if (cond && typeof cond === "object" && "field" in cond) {
+        fields.push(String((cond as { field?: unknown }).field ?? ""));
+      }
+    }
+    return fields.filter(Boolean);
+  }
+  if (def.type === "regression") {
+    const coefficients = Array.isArray(def.coefficients) ? def.coefficients : [];
+    return coefficients
+      .map((coef) => coef && typeof coef === "object" ? String((coef as { field?: unknown }).field ?? "") : "")
+      .filter(Boolean);
+  }
+  return [];
+}
 
 type LiteratureRule = {
   id: number;
@@ -314,6 +448,9 @@ export default function RulesPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [editTarget, setEditTarget] = useState<LiteratureRule | null>(null);
   const [form, setForm] = useState<RuleForm>(defaultForm);
+  const [cutoffBuilder, setCutoffBuilder] = useState<CutoffBuilderForm>(defaultCutoffBuilder);
+  const [regressionBuilder, setRegressionBuilder] = useState<RegressionBuilderForm>(defaultRegressionBuilder);
+  const [preview, setPreview] = useState<RulePreview | null>(null);
   const [filterOutcomeId, setFilterOutcomeId] = useState<string>("all");
   const [jsonError, setJsonError] = useState<string | null>(null);
 
@@ -350,16 +487,64 @@ export default function RulesPage() {
     onError: (e) => toast.error(`エラー: ${e.message}`),
   });
 
+  const isEasyRuleType = EASY_RULE_TYPES.has(form.ruleType);
+  const previewKey = JSON.stringify({
+    form: isEasyRuleType ? { ...form, ruleDefinition: "" } : form,
+    cutoffBuilder,
+    regressionBuilder,
+  });
+  const previewIsCurrent = preview?.key === previewKey;
+
   const openCreate = () => {
     setEditTarget(null);
     setForm(defaultForm);
+    setCutoffBuilder(defaultCutoffBuilder);
+    setRegressionBuilder(defaultRegressionBuilder);
+    setPreview(null);
     setJsonError(null);
     setDialogOpen(true);
   };
 
   const openEdit = (r: LiteratureRule & { ruleDefinition?: unknown; applyConditions?: unknown }) => {
     setEditTarget(r);
-    const rawConds = Array.isArray(r.applyConditions) ? r.applyConditions as Array<Record<string, string>> : [];
+    const rawConds = Array.isArray(r.applyConditions) ? r.applyConditions as Array<Record<string, unknown>> : [];
+    const def = r.ruleDefinition && typeof r.ruleDefinition === "object"
+      ? r.ruleDefinition as Record<string, unknown>
+      : {};
+    if (def.type === "cutoff") {
+      setCutoffBuilder({
+        field: String(def.field ?? defaultCutoffBuilder.field),
+        fieldLabel: String(def.fieldLabel ?? patientFieldLabel(String(def.field ?? defaultCutoffBuilder.field))),
+        operator: (def.operator as CutoffBuilderForm["operator"]) ?? defaultCutoffBuilder.operator,
+        threshold: String(def.threshold ?? defaultCutoffBuilder.threshold),
+        unit: String(def.unit ?? ""),
+        positiveMessage: String(def.positiveMessage ?? defaultCutoffBuilder.positiveMessage),
+        negativeMessage: String(def.negativeMessage ?? defaultCutoffBuilder.negativeMessage),
+      });
+    } else if (def.type === "regression") {
+      const rawCoefficients = Array.isArray(def.coefficients) ? def.coefficients as Array<Record<string, unknown>> : [];
+      setRegressionBuilder({
+        formula: String(def.formula ?? defaultRegressionBuilder.formula),
+        intercept: String(def.intercept ?? defaultRegressionBuilder.intercept),
+        threshold: String(def.threshold ?? defaultRegressionBuilder.threshold),
+        positiveMessage: String(def.positiveMessage ?? defaultRegressionBuilder.positiveMessage),
+        negativeMessage: String(def.negativeMessage ?? defaultRegressionBuilder.negativeMessage),
+        coefficients: rawCoefficients.length > 0
+          ? rawCoefficients.map((coef) => {
+              const field = String(coef.field ?? "bbs_score");
+              return {
+                field,
+                fieldLabel: String(coef.fieldLabel ?? patientFieldLabel(field)),
+                coefficient: String(coef.coefficient ?? "0"),
+                unit: String(coef.unit ?? ""),
+              };
+            })
+          : defaultRegressionBuilder.coefficients,
+      });
+    } else {
+      setCutoffBuilder(defaultCutoffBuilder);
+      setRegressionBuilder(defaultRegressionBuilder);
+    }
     setForm({
       outcomeId: r.outcomeId.toString(),
       name: r.name,
@@ -369,9 +554,9 @@ export default function RulesPage() {
       evidenceLevel: r.evidenceLevel,
       ruleDefinition: JSON.stringify(r.ruleDefinition ?? {}, null, 2),
       applyConditions: rawConds.map((c) => ({
-        field: c.field ?? "",
-        label: c.label ?? "",
-        operator: (c.operator ?? ">=") as ConditionOperator,
+        field: String(c.field ?? ""),
+        label: String(c.label ?? ""),
+        operator: normalizeConditionOperator(c.operator),
         value: String(c.value ?? ""),
       })),
       accuracy: r.accuracy?.toString() ?? "",
@@ -382,6 +567,7 @@ export default function RulesPage() {
       isActive: r.isActive,
       sortOrder: r.sortOrder.toString(),
     });
+    setPreview(null);
     setJsonError(null);
     setDialogOpen(true);
   };
@@ -392,6 +578,9 @@ export default function RulesPage() {
       ruleType: v,
       ruleDefinition: RULE_DEFINITION_TEMPLATES[v] ?? "{}",
     }));
+    setPreview(null);
+    if (v === "cutoff") setCutoffBuilder(defaultCutoffBuilder);
+    if (v === "regression") setRegressionBuilder(defaultRegressionBuilder);
   };
 
   const validateJson = (v: string) => {
@@ -405,11 +594,120 @@ export default function RulesPage() {
     }
   };
 
+  const buildRuleDefinition = (): { definition: Record<string, unknown>; logicLines: string[] } => {
+    if (form.ruleType === "cutoff") {
+      if (!cutoffBuilder.field) throw new Error("評価項目を選択してください");
+      if (!cutoffBuilder.fieldLabel.trim()) throw new Error("評価項目の表示名を入力してください");
+      if (!cutoffBuilder.positiveMessage.trim()) throw new Error("条件を満たした場合のメッセージを入力してください");
+      if (!cutoffBuilder.negativeMessage.trim()) throw new Error("条件を満たさない場合のメッセージを入力してください");
+      const threshold = parseRequiredNumber(cutoffBuilder.threshold, "カットオフ値");
+      const unit = cutoffBuilder.unit.trim();
+      const definition = {
+        type: "cutoff",
+        field: cutoffBuilder.field,
+        fieldLabel: cutoffBuilder.fieldLabel.trim(),
+        operator: cutoffBuilder.operator,
+        threshold,
+        unit,
+        positiveMessage: cutoffBuilder.positiveMessage.trim(),
+        negativeMessage: cutoffBuilder.negativeMessage.trim(),
+      };
+      return {
+        definition,
+        logicLines: [
+          `${definition.fieldLabel} ${definition.operator} ${threshold}${unit ? ` ${unit}` : ""}`,
+          `条件を満たす: ${definition.positiveMessage}`,
+          `条件を満たさない: ${definition.negativeMessage}`,
+        ],
+      };
+    }
+
+    if (form.ruleType === "regression") {
+      const intercept = parseRequiredNumber(regressionBuilder.intercept, "切片");
+      const threshold = parseRequiredNumber(regressionBuilder.threshold, "判定閾値");
+      if (!regressionBuilder.positiveMessage.trim()) throw new Error("閾値以上の場合のメッセージを入力してください");
+      if (!regressionBuilder.negativeMessage.trim()) throw new Error("閾値未満の場合のメッセージを入力してください");
+
+      const coefficients = regressionBuilder.coefficients.map((coef, index) => {
+        if (!coef.field) throw new Error(`係数${index + 1}の評価項目を選択してください`);
+        if (!coef.fieldLabel.trim()) throw new Error(`係数${index + 1}の表示名を入力してください`);
+        return {
+          field: coef.field,
+          fieldLabel: coef.fieldLabel.trim(),
+          coefficient: parseRequiredNumber(coef.coefficient, `係数${index + 1}`),
+          unit: coef.unit.trim() || undefined,
+        };
+      });
+      if (coefficients.length === 0) throw new Error("回帰式には少なくとも1つの係数が必要です");
+
+      const formula = regressionBuilder.formula.trim() || [
+        `予測値 = ${intercept}`,
+        ...coefficients.map((coef) => `${coef.coefficient >= 0 ? "+" : "-"} ${Math.abs(coef.coefficient)} * ${coef.fieldLabel}`),
+      ].join(" ");
+      const definition = {
+        type: "regression",
+        formula,
+        intercept,
+        coefficients,
+        threshold,
+        positiveMessage: regressionBuilder.positiveMessage.trim(),
+        negativeMessage: regressionBuilder.negativeMessage.trim(),
+      };
+      return {
+        definition,
+        logicLines: [
+          formula,
+          `判定: 予測値 >= ${threshold} なら陽性`,
+          `閾値以上: ${definition.positiveMessage}`,
+          `閾値未満: ${definition.negativeMessage}`,
+        ],
+      };
+    }
+
+    try {
+      const parsed = JSON.parse(form.ruleDefinition);
+      if (!parsed || typeof parsed !== "object") {
+        throw new Error("ルール定義JSONはオブジェクトで入力してください");
+      }
+      return {
+        definition: parsed as Record<string, unknown>,
+        logicLines: ["詳細JSONからルール定義を読み込みます"],
+      };
+    } catch (e) {
+      setJsonError("JSONの形式が正しくありません");
+      throw e instanceof Error ? e : new Error("JSONの形式が正しくありません");
+    }
+  };
+
+  const handlePreview = () => {
+    if (!form.outcomeId) { toast.warning("アウトカムを選択してください"); return; }
+    if (!form.name.trim()) { toast.warning("ルール名を入力してください"); return; }
+    if (!form.source.trim()) { toast.warning("文献情報を入力してください"); return; }
+
+    try {
+      const { definition, logicLines } = buildRuleDefinition();
+      const requiredFields = Array.from(new Set(extractPreviewFields(definition)));
+      if (isEasyRuleType) {
+        setForm((f) => ({ ...f, ruleDefinition: JSON.stringify(definition, null, 2) }));
+      }
+      setPreview({
+        key: previewKey,
+        definition,
+        requiredFields,
+        logicLines,
+      });
+      setJsonError(null);
+      toast.success("プレビューを更新しました");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "プレビューを作成できませんでした");
+    }
+  };
+
   const handleSubmit = () => {
     if (!form.outcomeId) { toast.warning("アウトカムを選択してください"); return; }
     if (!form.name.trim()) { toast.warning("ルール名を入力してください"); return; }
     if (!form.source.trim()) { toast.warning("文献情報を入力してください"); return; }
-    if (!validateJson(form.ruleDefinition)) return;
+    if (!preview || !previewIsCurrent) { toast.warning("登録前にプレビューを確認してください"); return; }
 
     const data = {
       outcomeId: Number(form.outcomeId),
@@ -421,10 +719,10 @@ export default function RulesPage() {
       applyConditions: form.applyConditions.map((c) => ({
         field: c.field,
         label: c.label || (PATIENT_FIELD_OPTIONS.find((f) => f.value === c.field)?.label ?? c.field),
-        operator: c.operator,
+        operator: normalizeConditionOperator(c.operator),
         value: isNaN(Number(c.value)) ? c.value : Number(c.value),
       })),
-      ruleDefinition: JSON.parse(form.ruleDefinition),
+      ruleDefinition: preview.definition,
       accuracy: form.accuracy ? Number(form.accuracy) : null,
       sensitivity: form.sensitivity ? Number(form.sensitivity) : null,
       specificity: form.specificity ? Number(form.specificity) : null,
@@ -579,11 +877,12 @@ export default function RulesPage() {
           </DialogHeader>
 
           <Tabs defaultValue="basic" className="mt-2">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="basic">基本情報</TabsTrigger>
-              <TabsTrigger value="definition">ルール定義</TabsTrigger>
-              <TabsTrigger value="conditions">適用条件</TabsTrigger>
-              <TabsTrigger value="accuracy">精度指標</TabsTrigger>
+            <TabsList className="grid h-auto w-full grid-cols-2 sm:grid-cols-5">
+              <TabsTrigger value="basic" className="text-xs sm:text-sm">基本情報</TabsTrigger>
+              <TabsTrigger value="definition" className="text-xs sm:text-sm">判定ルール</TabsTrigger>
+              <TabsTrigger value="conditions" className="text-xs sm:text-sm">適用条件</TabsTrigger>
+              <TabsTrigger value="accuracy" className="text-xs sm:text-sm">精度指標</TabsTrigger>
+              <TabsTrigger value="preview" className="text-xs sm:text-sm">プレビュー</TabsTrigger>
             </TabsList>
 
             {/* 基本情報タブ */}
@@ -780,24 +1079,251 @@ export default function RulesPage() {
               <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200">
                 <Info className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
                 <div className="text-xs text-blue-700">
-                  <p className="font-medium mb-1">ルール定義はJSON形式で入力します</p>
-                  <p>ルールタイプを変更するとテンプレートが自動挿入されます。変数名は患者情報フォームのフィールド名（age, nihss, bbs_score等）と一致させてください。</p>
+                  <p className="font-medium mb-1">{isEasyRuleType ? "フォーム入力から判定ルールを作成します" : "このルールタイプは詳細JSON編集です"}</p>
+                  <p>{isEasyRuleType ? "入力内容から内部のルール定義を自動生成します。登録前にプレビューで内容を確認してください。" : "決定木・複合条件などは従来の詳細JSONで編集します。登録前プレビューは必須です。"}</p>
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>ルール定義（JSON）</Label>
-                <Textarea
-                  className="font-mono text-xs min-h-64"
-                  value={form.ruleDefinition}
-                  onChange={(e) => {
-                    setForm((f) => ({ ...f, ruleDefinition: e.target.value }));
-                    validateJson(e.target.value);
-                  }}
-                />
-                {jsonError && (
-                  <p className="text-xs text-destructive">{jsonError}</p>
-                )}
-              </div>
+
+              {form.ruleType === "cutoff" && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>評価項目</Label>
+                      <Select
+                        value={cutoffBuilder.field}
+                        onValueChange={(v) => setCutoffBuilder((b) => ({ ...b, field: v, fieldLabel: patientFieldLabel(v) }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PATIENT_FIELD_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>表示名</Label>
+                      <Input
+                        value={cutoffBuilder.fieldLabel}
+                        onChange={(e) => setCutoffBuilder((b) => ({ ...b, fieldLabel: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr] gap-3">
+                    <div className="space-y-1.5">
+                      <Label>条件</Label>
+                      <Select
+                        value={cutoffBuilder.operator}
+                        onValueChange={(v) => setCutoffBuilder((b) => ({ ...b, operator: v as CutoffBuilderForm["operator"] }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value=">=">以上</SelectItem>
+                          <SelectItem value=">">超</SelectItem>
+                          <SelectItem value="<=">以下</SelectItem>
+                          <SelectItem value="<">未満</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>カットオフ値</Label>
+                      <Input
+                        type="number"
+                        step="any"
+                        value={cutoffBuilder.threshold}
+                        onChange={(e) => setCutoffBuilder((b) => ({ ...b, threshold: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>単位</Label>
+                      <Input
+                        placeholder="点、秒、m/s など"
+                        value={cutoffBuilder.unit}
+                        onChange={(e) => setCutoffBuilder((b) => ({ ...b, unit: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>条件を満たした場合の表示</Label>
+                    <Textarea
+                      className="min-h-20"
+                      value={cutoffBuilder.positiveMessage}
+                      onChange={(e) => setCutoffBuilder((b) => ({ ...b, positiveMessage: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>条件を満たさない場合の表示</Label>
+                    <Textarea
+                      className="min-h-20"
+                      value={cutoffBuilder.negativeMessage}
+                      onChange={(e) => setCutoffBuilder((b) => ({ ...b, negativeMessage: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {form.ruleType === "regression" && (
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label>式の説明</Label>
+                    <Textarea
+                      className="min-h-20"
+                      value={regressionBuilder.formula}
+                      onChange={(e) => setRegressionBuilder((b) => ({ ...b, formula: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>切片</Label>
+                      <Input
+                        type="number"
+                        step="any"
+                        value={regressionBuilder.intercept}
+                        onChange={(e) => setRegressionBuilder((b) => ({ ...b, intercept: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>判定閾値</Label>
+                      <Input
+                        type="number"
+                        step="any"
+                        value={regressionBuilder.threshold}
+                        onChange={(e) => setRegressionBuilder((b) => ({ ...b, threshold: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>係数</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => setRegressionBuilder((b) => ({
+                          ...b,
+                          coefficients: [...b.coefficients, { field: "age", fieldLabel: "年齢", coefficient: "0", unit: "歳" }],
+                        }))}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        係数を追加
+                      </Button>
+                    </div>
+                    {regressionBuilder.coefficients.map((coef, idx) => (
+                      <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1.4fr_1.2fr_0.8fr_0.7fr_auto] gap-2 items-end p-3 border rounded-lg bg-muted/30">
+                        <div className="space-y-1">
+                          <Label className="text-xs">評価項目</Label>
+                          <Select
+                            value={coef.field}
+                            onValueChange={(v) => setRegressionBuilder((b) => ({
+                              ...b,
+                              coefficients: b.coefficients.map((c, i) => i === idx ? { ...c, field: v, fieldLabel: patientFieldLabel(v) } : c),
+                            }))}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PATIENT_FIELD_OPTIONS.map((opt) => (
+                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">表示名</Label>
+                          <Input
+                            className="h-8 text-xs"
+                            value={coef.fieldLabel}
+                            onChange={(e) => setRegressionBuilder((b) => ({
+                              ...b,
+                              coefficients: b.coefficients.map((c, i) => i === idx ? { ...c, fieldLabel: e.target.value } : c),
+                            }))}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">係数</Label>
+                          <Input
+                            className="h-8 text-xs"
+                            type="number"
+                            step="any"
+                            value={coef.coefficient}
+                            onChange={(e) => setRegressionBuilder((b) => ({
+                              ...b,
+                              coefficients: b.coefficients.map((c, i) => i === idx ? { ...c, coefficient: e.target.value } : c),
+                            }))}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">単位</Label>
+                          <Input
+                            className="h-8 text-xs"
+                            value={coef.unit}
+                            onChange={(e) => setRegressionBuilder((b) => ({
+                              ...b,
+                              coefficients: b.coefficients.map((c, i) => i === idx ? { ...c, unit: e.target.value } : c),
+                            }))}
+                          />
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => setRegressionBuilder((b) => ({
+                            ...b,
+                            coefficients: b.coefficients.filter((_, i) => i !== idx),
+                          }))}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>閾値以上の場合の表示</Label>
+                    <Textarea
+                      className="min-h-20"
+                      value={regressionBuilder.positiveMessage}
+                      onChange={(e) => setRegressionBuilder((b) => ({ ...b, positiveMessage: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>閾値未満の場合の表示</Label>
+                    <Textarea
+                      className="min-h-20"
+                      value={regressionBuilder.negativeMessage}
+                      onChange={(e) => setRegressionBuilder((b) => ({ ...b, negativeMessage: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {!isEasyRuleType && (
+                <div className="space-y-1.5">
+                  <Label>ルール定義（JSON）</Label>
+                  <Textarea
+                    className="font-mono text-xs min-h-64"
+                    value={form.ruleDefinition}
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, ruleDefinition: e.target.value }));
+                      validateJson(e.target.value);
+                      setPreview(null);
+                    }}
+                  />
+                  {jsonError && (
+                    <p className="text-xs text-destructive">{jsonError}</p>
+                  )}
+                </div>
+              )}
             </TabsContent>
 
             {/* 精度指標タブ */}
@@ -849,13 +1375,107 @@ export default function RulesPage() {
                 />
               </div>
             </TabsContent>
+
+            {/* プレビュータブ */}
+            <TabsContent value="preview" className="space-y-4 mt-4">
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+                <Eye className="h-4 w-4 text-emerald-700 mt-0.5 shrink-0" />
+                <div className="text-xs text-emerald-800">
+                  <p className="font-medium mb-1">登録前プレビュー</p>
+                  <p>登録前に、文献カードとしての表示内容と判定ロジックを確認します。内容を変更した場合はプレビューを更新してください。</p>
+                </div>
+              </div>
+
+              <Button type="button" className="w-full gap-2" onClick={handlePreview}>
+                <Eye className="h-4 w-4" />
+                プレビューを更新
+              </Button>
+
+              {!preview && (
+                <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  まだプレビューが作成されていません。必要項目を入力してからプレビューを更新してください。
+                </div>
+              )}
+
+              {preview && !previewIsCurrent && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                  <AlertTriangle className="h-4 w-4 text-amber-700 mt-0.5 shrink-0" />
+                  <div className="text-xs text-amber-800">
+                    <p className="font-medium mb-1">プレビューが古くなっています</p>
+                    <p>入力内容が変更されています。登録する前にプレビューを更新してください。</p>
+                  </div>
+                </div>
+              )}
+
+              {preview && previewIsCurrent && (
+                <div className="space-y-3">
+                  <Card className="border-emerald-200">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold">{form.name}</h3>
+                            <Badge variant="outline">{RULE_TYPE_LABELS[form.ruleType] ?? form.ruleType}</Badge>
+                            <Badge variant="secondary">{form.outcomeId ? outcomeName(Number(form.outcomeId)) : "アウトカム未選択"}</Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">{form.source}</p>
+                        </div>
+                        <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                      </div>
+
+                      <div className="rounded-lg bg-muted/40 p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Calculator className="h-4 w-4 text-primary" />
+                          <p className="text-sm font-medium">判定ロジック</p>
+                        </div>
+                        <div className="space-y-1 text-sm">
+                          {preview.logicLines.map((line, idx) => (
+                            <p key={idx}>{line}</p>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">必要な評価項目</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {preview.requiredFields.length > 0 ? preview.requiredFields.map((field) => (
+                            <Badge key={field} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                              {fieldLabel(field)}
+                            </Badge>
+                          )) : (
+                            <span className="text-xs text-muted-foreground">ルール定義から自動抽出できる評価項目はありません</span>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
 
-          <DialogFooter className="mt-4">
+          <DialogFooter className="mt-4 gap-2 sm:justify-between">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mr-auto">
+              {previewIsCurrent ? (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  プレビュー確認済み
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                  登録前プレビューが必要です
+                </>
+              )}
+            </div>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>キャンセル</Button>
+            <Button variant="outline" onClick={handlePreview} className="gap-2">
+              <Eye className="h-4 w-4" />
+              プレビュー
+            </Button>
             <Button
               onClick={handleSubmit}
-              disabled={createMutation.isPending || updateMutation.isPending || !!jsonError}
+              disabled={createMutation.isPending || updateMutation.isPending || !!jsonError || !previewIsCurrent}
             >
               {editTarget ? "更新" : "登録"}
             </Button>

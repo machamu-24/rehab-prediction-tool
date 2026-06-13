@@ -37,8 +37,8 @@ import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { Button } from "./ui/button";
 
 const menuItems = [
-  { icon: Activity,       label: "予測実行",     path: "/" },
-  { icon: History,        label: "予測履歴",     path: "/history" },
+  { icon: Activity,       label: "文献照合",     path: "/" },
+  { icon: History,        label: "照合履歴",     path: "/history" },
   { icon: BookOpen,       label: "文献ルール管理", path: "/rules" },
   { icon: ClipboardList,  label: "アウトカム管理", path: "/outcomes" },
 ];
@@ -146,7 +146,7 @@ function DashboardLayoutContent({
                       RehabPredict
                     </p>
                     <p className="text-[10px] text-sidebar-foreground/60 truncate leading-tight">
-                      予後予測支援ツール
+                      文献ベース予後支援ツール
                     </p>
                   </div>
                 </div>
