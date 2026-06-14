@@ -47,6 +47,7 @@ const SIDEBAR_WIDTH_KEY = "sidebar-width";
 const DEFAULT_WIDTH = 260;
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
+const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
 
 export default function DashboardLayout({
   children,
@@ -146,7 +147,7 @@ function DashboardLayoutContent({
                       RehabPredict
                     </p>
                     <p className="text-[10px] text-sidebar-foreground/60 truncate leading-tight">
-                      文献ベース予後支援ツール
+                      {IS_DEMO_MODE ? "静的デモ版" : "文献ベース予後支援ツール"}
                     </p>
                   </div>
                 </div>

@@ -167,7 +167,12 @@ pnpm build
 
 # 本番サーバー起動
 pnpm start
+
+# 静的デモ版ビルド（DB/APIなし）
+pnpm build:demo
 ```
+
+静的デモ版の公開手順は [DEMO_DEPLOY.md](./DEMO_DEPLOY.md) を参照。
 
 ---
 

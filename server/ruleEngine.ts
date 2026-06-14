@@ -217,7 +217,7 @@ function extractPredictorLabels(def: RuleDefinition): string[] {
     case "nomogram":
       return uniqueNonEmpty(def.variables.map((variable) => variable.fieldLabel || variable.field));
     case "composite_rule":
-      return uniqueNonEmpty(extractLabelsFromLogicNode(def.root));
+      return def.root ? uniqueNonEmpty(extractLabelsFromLogicNode(def.root)) : [];
     case "custom_formula":
       return uniqueNonEmpty(def.variables.map((variable) => variable.fieldLabel || variable.field));
     default:
