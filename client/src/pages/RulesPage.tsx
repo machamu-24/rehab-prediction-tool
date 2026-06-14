@@ -96,7 +96,7 @@ function fieldLabel(field: string): string {
 
 const RULE_TYPE_OPTIONS = [
   { value: "cutoff",         label: "カットオフ値",     desc: "単一または複合のカットオフ値による判定" },
-  { value: "decision_tree",  label: "決定木",           desc: "分岐条件による段階的な判定（EPOS等）" },
+  { value: "decision_tree",  label: "決定木",           desc: "分岐条件による段階的な判定" },
   { value: "regression",     label: "重回帰式",         desc: "複数変数の線形結合による数値予測" },
   { value: "scoring_system", label: "スコアリング",     desc: "各変数に点数を割り当て合計で判定" },
   { value: "nomogram",       label: "ノモグラム",       desc: "ロジスティック回帰ベースの確率算出" },

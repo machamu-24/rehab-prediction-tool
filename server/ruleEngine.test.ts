@@ -37,9 +37,9 @@ const cutoffRule = {
 const decisionTreeRule = {
   id: 2,
   outcomeId: 1,
-  name: "EPOSモデル",
+  name: "決定木テストルール",
   ruleType: "decision_tree" as const,
-  source: "Veerbeek et al. (2011)",
+  source: "Test Source",
   sourceUrl: null,
   evidenceLevel: "Systematic Review",
   applyConditions: [{ field: "days_since_onset", operator: "<=", value: 3 }],

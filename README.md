@@ -14,7 +14,7 @@
 | **患者情報入力** | 年齢・性別・発症日数・NIHSS・BBS・TCT・歩行速度など |
 | **予測エンジン** | 登録された文献ルールを動的に評価し、コンセンサス分析を実施 |
 | **予測結果表示** | 個別ルール結果カード・総合コンセンサススコア・色分け表示 |
-| **時期依存ガイド** | 発症日数に応じてEPOS・TWISTなど時期限定ルールの適用可否をリアルタイム表示 |
+| **時期依存ガイド** | 発症日数に応じて時期限定ルールの適用可否をリアルタイム表示 |
 | **追加評価の提案** | 現在の入力では使えないルールについて、追加取得すべき評価項目を案内 |
 | **予測履歴** | 予測結果をDBに保存し、退院時実績の入力・CSV出力が可能 |
 
@@ -206,10 +206,11 @@ rehab-prediction-tool/
 
 | ルール名 | 文献 |
 |----------|------|
-| EPOSモデル（決定木） | Veerbeek JM et al. (2011). *Early prediction of outcome of activities of daily living after stroke.* Stroke. |
-| BBSカットオフ（歩行自立） | Jenkin SE et al. (2021). *Predictors of independent walking after stroke.* Physiotherapy Canada. |
-| NIHSS性別補正カットオフ | Murata Y et al. (2019). *Sex-specific NIHSS cutoff for walking independence.* J Stroke Cerebrovasc Dis. |
-| TCTカットオフ（TWIST） | Ohura T et al. (2000). *Trunk Control Test for stroke outcome prediction.* Disabil Rehabil. |
+| 膝伸展筋力カットオフ | 松下達也ら（2022）理学療法科学 37(4): 275-280 |
+| 信号検出分析による決定木 | 吉松竜貴ら（2018）理学療法科学 33(1): 145-150 |
+| 歩行自立スコア | 池上ら（2025）理学療法科学 40(4): 181-188 |
+| BBS入院時スコアによる地域歩行予測 | Louie DR, Eng JJ (2018). *Journal of Rehabilitation Medicine.* |
+| 地域歩行レベル予測の臨床指標 | Lee et al. (2016). *Journal of Physical Therapy Science.* |
 
 ---
 
