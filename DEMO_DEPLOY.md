@@ -22,13 +22,16 @@ pnpm exec vite preview --host 0.0.0.0
 
 ## GitHub Pages
 
-このリポジトリには `.github/workflows/deploy-demo-pages.yml` を追加済みです。
+このリポジトリには `.github/workflows/deploy-demo-pages.yml` を追加済みです。  
+`main` ブランチにpushすると静的デモをビルドし、成果物を `gh-pages` ブランチへ反映します。
 
 1. GitHubのリポジトリ設定で `Settings > Pages` を開く
-2. `Build and deployment > Source` を `GitHub Actions` にする
-3. `main` ブランチへpushする、またはActions画面から `Deploy static demo to GitHub Pages` を手動実行する
+2. `Build and deployment > Source` を `Deploy from a branch` にする
+3. `Branch` を `gh-pages`、フォルダを `/ (root)` にする
+4. `main` ブランチへpushする、またはActions画面から `Deploy static demo to GitHub Pages` を手動実行する
 
-公開URLは通常 `https://<owner>.github.io/<repository>/` です。
+公開URLは通常 `https://<owner>.github.io/<repository>/` です。  
+このリポジトリでは `https://machamu-24.github.io/rehab-prediction-tool/` です。
 
 ## Cloudflare Pages
 
