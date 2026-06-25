@@ -1,6 +1,6 @@
 # 静的デモ版のデプロイ手順
 
-このデモ版は、既存の文献ルールをビルド時にJSONとして同梱し、ブラウザ内で予測エンジンを動かします。
+このデモ版は、`scripts/demo-data.snapshot.json` に固定した文献ルールをビルド時にJSONとして同梱し、ブラウザ内で予測エンジンを動かします。
 MySQL、Express、tRPC APIサーバーは使いません。
 
 ## デモ版でできること
@@ -18,6 +18,12 @@ MySQL、Express、tRPC APIサーバーは使いません。
 ```bash
 pnpm build:demo
 pnpm exec vite preview --host 0.0.0.0
+```
+
+ローカルDBの最新文献ルールを静的デモへ反映する場合は、DB接続できる環境で以下を実行してからコミットします。
+
+```bash
+pnpm refresh:demo-data
 ```
 
 ## GitHub Pages

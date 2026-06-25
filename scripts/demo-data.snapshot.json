@@ -1,0 +1,1339 @@
+{
+  "version": "2026-06-25-db-snapshot-v1",
+  "generatedAt": "2026-06-25T11:04:28.997Z",
+  "source": "local database outcomes and literature_rules",
+  "outcomes": [
+    {
+      "id": 1,
+      "name": "歩行自立",
+      "description": "回復期リハビリテーション退院時または6ヶ月後の歩行自立（FAC≥4）",
+      "unit": "FAC",
+      "positiveLabel": "歩行自立",
+      "negativeLabel": "歩行非自立",
+      "isDefault": true,
+      "sortOrder": 0,
+      "createdAt": "2026-05-11T09:11:25.000Z",
+      "updatedAt": "2026-05-11T09:11:25.000Z"
+    },
+    {
+      "id": 2,
+      "name": "FIM運動項目",
+      "description": "退院時FIM運動項目合計スコア（13項目, 最大91点）",
+      "unit": "点",
+      "positiveLabel": "高得点（自立度高）",
+      "negativeLabel": "低得点（要介助）",
+      "isDefault": false,
+      "sortOrder": 2,
+      "createdAt": "2026-05-11T09:11:53.000Z",
+      "updatedAt": "2026-05-11T09:11:53.000Z"
+    },
+    {
+      "id": 3,
+      "name": "地域歩行",
+      "description": "退院後に地域内を安全に歩行できるか（5MWT ≥0.8 m/s を目安）",
+      "unit": "m/s",
+      "positiveLabel": "地域歩行可能",
+      "negativeLabel": "地域歩行困難",
+      "isDefault": false,
+      "sortOrder": 3,
+      "createdAt": "2026-05-11T09:13:16.000Z",
+      "updatedAt": "2026-05-11T09:13:16.000Z"
+    }
+  ],
+  "rules": [
+    {
+      "id": 30001,
+      "outcomeId": 1,
+      "name": "麻痺側膝伸展筋力カットオフ（病棟歩行自立）",
+      "ruleType": "cutoff",
+      "source": "松下達也ら（2022）理学療法科学 37(4): 275-280",
+      "sourceUrl": "https://www.jstage.jst.go.jp/article/rigaku/49/4/49_12232/_article/-char/ja/",
+      "evidenceLevel": "Cohort Study",
+      "applyConditions": [],
+      "ruleDefinition": {
+        "type": "cutoff",
+        "unit": "Nm/kg",
+        "field": "knee_ext_paretic_nm_kg",
+        "operator": ">=",
+        "threshold": 0.631,
+        "fieldLabel": "麻痺側膝伸展筋力（Nm/kg）",
+        "negativeMessage": "病棟歩行自立は困難な可能性（麻痺側膝伸展筋力 < 0.631 Nm/kg）",
+        "positiveMessage": "病棟歩行自立の可能性が高い（麻痺側膝伸展筋力 ≥ 0.631 Nm/kg）"
+      },
+      "accuracy": null,
+      "sensitivity": 0.7089999914169312,
+      "specificity": 0.628000020980835,
+      "auc": 0.7129999995231628,
+      "consensusEligible": true,
+      "isActive": true,
+      "sortOrder": 10,
+      "createdAt": "2026-05-11T09:11:53.000Z",
+      "updatedAt": "2026-06-06T22:39:17.000Z"
+    },
+    {
+      "id": 30002,
+      "outcomeId": 1,
+      "name": "両側合計膝伸展筋力カットオフ（病棟歩行自立）",
+      "ruleType": "cutoff",
+      "source": "松下達也ら（2022）理学療法科学 37(4): 275-280",
+      "sourceUrl": "https://www.jstage.jst.go.jp/article/rigaku/49/4/49_12232/_article/-char/ja/",
+      "evidenceLevel": "Cohort Study",
+      "applyConditions": [],
+      "ruleDefinition": {
+        "type": "cutoff",
+        "unit": "Nm/kg",
+        "field": "knee_ext_total_nm_kg",
+        "operator": ">=",
+        "threshold": 1.621,
+        "fieldLabel": "両側合計膝伸展筋力（Nm/kg）",
+        "negativeMessage": "病棟歩行自立は困難な可能性（両側合計膝伸展筋力 < 1.621 Nm/kg）",
+        "positiveMessage": "病棟歩行自立の可能性が高い（両側合計膝伸展筋力 ≥ 1.621 Nm/kg）"
+      },
+      "accuracy": null,
+      "sensitivity": 0.6869999766349792,
+      "specificity": 0.6539999842643738,
+      "auc": 0.7289999723434448,
+      "consensusEligible": true,
+      "isActive": true,
+      "sortOrder": 11,
+      "createdAt": "2026-05-11T09:11:53.000Z",
+      "updatedAt": "2026-06-06T22:39:23.000Z"
+    },
+    {
+      "id": 30003,
+      "outcomeId": 1,
+      "name": "FBS・起居動作・認知機能による決定木（入院3ヶ月後歩行自立）",
+      "ruleType": "decision_tree",
+      "source": "吉松竜貴ら（2018）理学療法科学 33(1): 145-150",
+      "sourceUrl": "https://www.jstage.jst.go.jp/article/rika/33/1/33_145/_article/-char/ja/",
+      "evidenceLevel": "Cohort Study",
+      "applyConditions": [],
+      "ruleDefinition": {
+        "type": "decision_tree",
+        "nodes": [
+          {
+            "id": "root",
+            "unit": "点",
+            "field": "bbs_score",
+            "operator": ">=",
+            "threshold": 13,
+            "fieldLabel": "BBS（Berg Balance Scale）",
+            "trueNodeId": "leaf_group1",
+            "falseNodeId": "check_sit_up"
+          },
+          {
+            "id": "check_sit_up",
+            "field": "sit_up_independent",
+            "operator": "boolean",
+            "fieldLabel": "起居動作（介助不要）",
+            "trueNodeId": "leaf_group2",
+            "falseNodeId": "check_cognition"
+          },
+          {
+            "id": "check_cognition",
+            "field": "cognitive_impairment",
+            "operator": "boolean_negative",
+            "fieldLabel": "認知機能低下あり",
+            "trueNodeId": "leaf_group3",
+            "falseNodeId": "leaf_group4"
+          },
+          {
+            "id": "leaf_group1",
+            "field": "",
+            "isLeaf": true,
+            "message": "グループ1: 歩行自立率68.3%（FBS≥13点）",
+            "operator": "boolean",
+            "fieldLabel": "",
+            "isPositive": true,
+            "probability": 0.683
+          },
+          {
+            "id": "leaf_group2",
+            "field": "",
+            "isLeaf": true,
+            "message": "グループ2: 歩行自立率30.6%（FBS<13 & 起居動作介助不要）",
+            "operator": "boolean",
+            "fieldLabel": "",
+            "isPositive": true,
+            "probability": 0.306
+          },
+          {
+            "id": "leaf_group3",
+            "field": "",
+            "isLeaf": true,
+            "message": "グループ3: 歩行自立率22.2%（FBS<13 & 起居動作介助必要 & 認知機能低下なし）",
+            "operator": "boolean",
+            "fieldLabel": "",
+            "isPositive": false,
+            "probability": 0.222
+          },
+          {
+            "id": "leaf_group4",
+            "field": "",
+            "isLeaf": true,
+            "message": "グループ4: 歩行自立率5.5%（FBS<13 & 起居動作介助必要 & 認知機能低下あり）",
+            "operator": "boolean",
+            "fieldLabel": "",
+            "isPositive": false,
+            "probability": 0.055
+          }
+        ],
+        "notes": "対象: 初発脳卒中患者251名（年齢68.4±11.1歳）。全体歩行自立率25.9%（65/251名）。グループ4を参照群とした場合のOR: グループ3=4.9, グループ2=7.6, グループ1=37.3。",
+        "description": "信号検出分析法（Signal Detection Analysis）による決定木。入院時情報から3ヶ月後の歩行自立を予測する。"
+      },
+      "accuracy": null,
+      "sensitivity": 0.6309999823570251,
+      "specificity": 0.8980000019073486,
+      "auc": null,
+      "consensusEligible": true,
+      "isActive": true,
+      "sortOrder": 12,
+      "createdAt": "2026-05-11T09:11:53.000Z",
+      "updatedAt": "2026-06-06T22:37:31.000Z"
+    },
+    {
+      "id": 30004,
+      "outcomeId": 1,
+      "name": "歩行自立スコア（年齢・BBS・FIM運動・FIM認知）",
+      "ruleType": "scoring_system",
+      "source": "池上滉一ら（2025）理学療法科学 40(4): 181-187",
+      "sourceUrl": "https://www.jstage.jst.go.jp/article/rika/40/4/40_181/_article/-char/ja",
+      "evidenceLevel": "Cohort Study",
+      "applyConditions": [],
+      "ruleDefinition": {
+        "type": "scoring_system",
+        "items": [
+          {
+            "auc": 0.713,
+            "unit": "歳",
+            "bands": [
+              {
+                "label": "≤77.5歳",
+                "score": 1,
+                "value": 77.5,
+                "operator": "<="
+              },
+              {
+                "label": ">77.5歳",
+                "score": 0,
+                "value": 77.5,
+                "operator": ">"
+              }
+            ],
+            "field": "age",
+            "fieldLabel": "年齢（歳）"
+          },
+          {
+            "auc": 0.825,
+            "unit": "点",
+            "bands": [
+              {
+                "label": "≥16点",
+                "score": 1,
+                "value": 16,
+                "operator": ">="
+              },
+              {
+                "label": "<16点",
+                "score": 0,
+                "value": 16,
+                "operator": "<"
+              }
+            ],
+            "field": "bbs_score",
+            "fieldLabel": "Berg Balance Scale（BBS）"
+          },
+          {
+            "auc": 0.838,
+            "unit": "点",
+            "bands": [
+              {
+                "label": "≥37.5点",
+                "score": 1,
+                "value": 37.5,
+                "operator": ">="
+              },
+              {
+                "label": "<37.5点",
+                "score": 0,
+                "value": 37.5,
+                "operator": "<"
+              }
+            ],
+            "field": "fim_motor_total",
+            "fieldLabel": "FIM運動項目合計"
+          },
+          {
+            "auc": 0.838,
+            "unit": "点",
+            "bands": [
+              {
+                "label": "≥20.5点",
+                "score": 1,
+                "value": 20.5,
+                "operator": ">="
+              },
+              {
+                "label": "<20.5点",
+                "score": 0,
+                "value": 20.5,
+                "operator": "<"
+              }
+            ],
+            "field": "fim_cognitive_total",
+            "fieldLabel": "FIM認知項目合計"
+          }
+        ],
+        "notes": "対象: 229名（自立群117名, 非自立群112名）。最適カットオフ3点: 感度80.3%, 特異度85.7%, AUC=0.890。",
+        "maxScore": 4,
+        "threshold": 3,
+        "description": "入棟時情報から退院時の平地歩行自立を予測するスコアリングシステム。各因子のROC曲線から最適カットオフ値を算出し、各1点を割り振る（合計0-4点）。",
+        "negativeMessage": "退院時平地歩行自立は困難な可能性（スコア≤2点: 自立率0-40.6%）",
+        "positiveMessage": "退院時平地歩行自立の可能性が高い（スコア≥3点: 自立率78.9-92.5%）",
+        "scoreProbabilityTable": [
+          {
+            "n": 53,
+            "score": 4,
+            "positiveN": 49,
+            "probability": 0.925
+          },
+          {
+            "n": 57,
+            "score": 3,
+            "positiveN": 45,
+            "probability": 0.789
+          },
+          {
+            "n": 32,
+            "score": 2,
+            "positiveN": 13,
+            "probability": 0.406
+          },
+          {
+            "n": 53,
+            "score": 1,
+            "positiveN": 10,
+            "probability": 0.189
+          },
+          {
+            "n": 34,
+            "score": 0,
+            "positiveN": 0,
+            "probability": 0
+          }
+        ]
+      },
+      "accuracy": null,
+      "sensitivity": 0.8029999732971191,
+      "specificity": 0.8569999933242798,
+      "auc": 0.8899999856948853,
+      "consensusEligible": true,
+      "isActive": true,
+      "sortOrder": 13,
+      "createdAt": "2026-05-11T09:11:53.000Z",
+      "updatedAt": "2026-06-06T22:42:44.000Z"
+    },
+    {
+      "id": 30005,
+      "outcomeId": 1,
+      "name": "平地歩行自立時期予測ノモグラム（Cox比例ハザードモデル）",
+      "ruleType": "nomogram",
+      "source": "池上滉一ら（2025）Jpn J Rehabil Med 62(11): 1139-1150",
+      "sourceUrl": "https://www.jstage.jst.go.jp/article/jjrmc/62/11/62_25020/_article/-char/ja",
+      "evidenceLevel": "Cohort Study",
+      "applyConditions": [],
+      "ruleDefinition": {
+        "type": "nomogram",
+        "notes": "対象: 228名。C-index=0.858（ブートストラップ0.851）。MAE=0.022, O/E比=1.040。発症120日以降の予測は対象外。",
+        "modelType": "cox_proportional_hazards",
+        "variables": [
+          {
+            "ci95": [
+              0.958,
+              0.991
+            ],
+            "unit": "歳",
+            "field": "age",
+            "notes": "年齢が高いほど歩行自立が遅れる",
+            "pValue": 0.01,
+            "direction": "negative",
+            "fieldLabel": "年齢",
+            "coefficient": -0.026,
+            "hazardRatio": 0.974
+          },
+          {
+            "ci95": [
+              0.937,
+              0.997
+            ],
+            "unit": "日",
+            "field": "days_since_onset",
+            "notes": "発症後日数が多いほど歩行自立が遅れる",
+            "pValue": 0.05,
+            "direction": "negative",
+            "fieldLabel": "発症後日数",
+            "coefficient": -0.034,
+            "hazardRatio": 0.966
+          },
+          {
+            "ci95": [
+              1.117,
+              3.274
+            ],
+            "unit": "binary",
+            "field": "sit_up_independent",
+            "notes": "起き上がり介助不要で歩行自立が早まる",
+            "pValue": 0.05,
+            "direction": "positive",
+            "fieldLabel": "起き上がり能力（介助なし=1, 介助あり=0）",
+            "coefficient": 0.649,
+            "hazardRatio": 1.912
+          },
+          {
+            "ci95": [
+              1.015,
+              1.048
+            ],
+            "unit": "点",
+            "field": "bbs_score",
+            "notes": "BBS高いほど歩行自立が早まる",
+            "pValue": 0.001,
+            "direction": "positive",
+            "fieldLabel": "Berg Balance Scale（BBS）",
+            "coefficient": 0.031,
+            "hazardRatio": 1.031
+          },
+          {
+            "ci95": [
+              1.008,
+              1.04
+            ],
+            "unit": "点",
+            "field": "fim_motor_total",
+            "notes": "FIM運動高いほど歩行自立が早まる",
+            "pValue": 0.01,
+            "direction": "positive",
+            "fieldLabel": "FIM運動項目合計",
+            "coefficient": 0.024,
+            "hazardRatio": 1.024
+          },
+          {
+            "ci95": [
+              1.047,
+              1.113
+            ],
+            "unit": "点",
+            "field": "fim_cognitive_total",
+            "notes": "FIM認知高いほど歩行自立が早まる",
+            "pValue": 0.001,
+            "direction": "positive",
+            "fieldLabel": "FIM認知項目合計",
+            "coefficient": 0.076,
+            "hazardRatio": 1.079
+          }
+        ],
+        "description": "Cox比例ハザード分析に基づくノモグラム。入棟時情報から発症30・60・90・120日後の平地歩行自立確率を時系列で予測する。",
+        "usageExample": "年齢70歳, 発症後17日, 起き上がり介助なし, BBS 23点, FIM運動41点, FIM認知24点 → 合計約203ポイント → 発症120日後の歩行自立確率 約70%",
+        "negativeMessage": "発症120日後の平地歩行自立確率が低い（合計ポイントが低い）",
+        "positiveMessage": "発症120日後の平地歩行自立確率が高い（合計ポイントが高い）",
+        "outcomeTimepoints": [
+          30,
+          60,
+          90,
+          120
+        ],
+        "outcomeLabelTemplate": "発症{days}日後の平地歩行自立確率"
+      },
+      "accuracy": null,
+      "sensitivity": null,
+      "specificity": null,
+      "auc": 0.8579999804496765,
+      "consensusEligible": true,
+      "isActive": true,
+      "sortOrder": 14,
+      "createdAt": "2026-05-11T09:11:53.000Z",
+      "updatedAt": "2026-06-06T22:43:15.000Z"
+    },
+    {
+      "id": 30006,
+      "outcomeId": 1,
+      "name": "変化量を用いた決定木・重度群（ΔBBS・ΔFIM運動）",
+      "ruleType": "decision_tree",
+      "source": "石野晶大ら（2023）愛知県理学療法学会誌 第35巻",
+      "sourceUrl": "http://aichi-npopt.jp/info_paper_back.html",
+      "evidenceLevel": "Cohort Study",
+      "applyConditions": [
+        {
+          "field": "fim_motor_total",
+          "label": "入棟時FIM運動項目<50点（重度群）",
+          "value": 50,
+          "operator": "<"
+        }
+      ],
+      "ruleDefinition": {
+        "type": "decision_tree",
+        "nodes": [
+          {
+            "id": "n1",
+            "field": "delta_bbs",
+            "isLeaf": false,
+            "operator": ">=",
+            "threshold": 20,
+            "fieldLabel": "ΔBBS（BBS変化量）",
+            "trueNodeId": "leaf_pos1",
+            "falseNodeId": "n2"
+          },
+          {
+            "id": "leaf_pos1",
+            "field": "",
+            "isLeaf": true,
+            "message": "退棟時歩行自立（ΔBBS≥20: 確信度85%）",
+            "operator": ">=",
+            "fieldLabel": "",
+            "isPositive": true
+          },
+          {
+            "id": "n2",
+            "field": "delta_fim_motor",
+            "isLeaf": false,
+            "operator": ">=",
+            "threshold": 23,
+            "fieldLabel": "ΔFIM運動（FIM運動変化量）",
+            "trueNodeId": "n3",
+            "falseNodeId": "n4"
+          },
+          {
+            "id": "n3",
+            "field": "age",
+            "isLeaf": false,
+            "operator": "<",
+            "threshold": 67.5,
+            "fieldLabel": "年齢",
+            "trueNodeId": "leaf_pos2",
+            "falseNodeId": "n5"
+          },
+          {
+            "id": "leaf_pos2",
+            "field": "",
+            "isLeaf": true,
+            "message": "退棟時歩行自立（ΔFIM運動≥23 & 年齢<67.5歳: 確信度75%）",
+            "operator": ">=",
+            "fieldLabel": "",
+            "isPositive": true
+          },
+          {
+            "id": "n5",
+            "field": "fim_motor_total",
+            "isLeaf": false,
+            "operator": ">=",
+            "threshold": 43,
+            "fieldLabel": "FIM 運動項目合計",
+            "trueNodeId": "leaf_pos3",
+            "falseNodeId": "leaf_neg1"
+          },
+          {
+            "id": "leaf_pos3",
+            "field": "",
+            "isLeaf": true,
+            "message": "退棟時歩行自立（ΔFIM運動≥23 & 年齢≥67.5 & FIM運動≥43: 確信度70%）",
+            "operator": ">=",
+            "fieldLabel": "",
+            "isPositive": true
+          },
+          {
+            "id": "leaf_neg1",
+            "field": "",
+            "isLeaf": true,
+            "message": "退棟時歩行非自立（ΔFIM運動≥23 & 年齢≥67.5 & FIM運動<43: 確信度80%）",
+            "operator": ">=",
+            "fieldLabel": "",
+            "isPositive": false
+          },
+          {
+            "id": "n4",
+            "field": "fim_motor_total",
+            "isLeaf": false,
+            "operator": ">=",
+            "threshold": 43,
+            "fieldLabel": "FIM 運動項目合計",
+            "trueNodeId": "leaf_pos4",
+            "falseNodeId": "leaf_neg2"
+          },
+          {
+            "id": "leaf_pos4",
+            "field": "",
+            "isLeaf": true,
+            "message": "退棟時歩行自立（ΔFIM運動<23 & FIM運動≥43: 確信度65%）",
+            "operator": ">=",
+            "fieldLabel": "",
+            "isPositive": true
+          },
+          {
+            "id": "leaf_neg2",
+            "field": "",
+            "isLeaf": true,
+            "message": "退棟時歩行非自立（ΔFIM運動<23 & FIM運動<43: 確信度85%）",
+            "operator": ">=",
+            "fieldLabel": "",
+            "isPositive": false
+          }
+        ]
+      },
+      "accuracy": null,
+      "sensitivity": 0.7139999866485596,
+      "specificity": 0.7250000238418579,
+      "auc": 0.7599999904632568,
+      "consensusEligible": true,
+      "isActive": true,
+      "sortOrder": 15,
+      "createdAt": "2026-05-11T09:11:53.000Z",
+      "updatedAt": "2026-06-13T22:35:04.000Z"
+    },
+    {
+      "id": 30007,
+      "outcomeId": 1,
+      "name": "変化量を用いた決定木・中等度群（ΔFIM運動・CBA）",
+      "ruleType": "decision_tree",
+      "source": "石野晶大ら（2023）愛知県理学療法学会誌 第35巻",
+      "sourceUrl": "http://aichi-npopt.jp/info_paper_back.html",
+      "evidenceLevel": "Cohort Study",
+      "applyConditions": [
+        {
+          "field": "fim_motor_total",
+          "label": "入棟時FIM運動項目≥50点",
+          "value": 50,
+          "operator": ">="
+        },
+        {
+          "field": "fim_motor_total",
+          "label": "入棟時FIM運動項目<70点（中等度群）",
+          "value": 70,
+          "operator": "<"
+        }
+      ],
+      "ruleDefinition": {
+        "type": "decision_tree",
+        "nodes": [
+          {
+            "id": "n1",
+            "field": "delta_fim_motor",
+            "isLeaf": false,
+            "operator": ">=",
+            "threshold": 12,
+            "fieldLabel": "ΔFIM運動（FIM運動変化量）",
+            "trueNodeId": "leaf_pos1",
+            "falseNodeId": "n2"
+          },
+          {
+            "id": "leaf_pos1",
+            "field": "",
+            "isLeaf": true,
+            "message": "退棟時歩行自立（ΔFIM運動≥12: 確信度90%）",
+            "operator": ">=",
+            "fieldLabel": "",
+            "isPositive": true
+          },
+          {
+            "id": "n2",
+            "field": "cba_score",
+            "isLeaf": false,
+            "operator": ">=",
+            "threshold": 18,
+            "fieldLabel": "CBA（認知関連行動評価）",
+            "trueNodeId": "n3",
+            "falseNodeId": "leaf_neg1"
+          },
+          {
+            "id": "leaf_neg1",
+            "field": "",
+            "isLeaf": true,
+            "message": "退棟時歩行非自立（ΔFIM運動<12 & CBA<18: 確信度80%）",
+            "operator": ">=",
+            "fieldLabel": "",
+            "isPositive": false
+          },
+          {
+            "id": "n3",
+            "field": "delta_fim_cognitive",
+            "isLeaf": false,
+            "operator": ">=",
+            "threshold": 1,
+            "fieldLabel": "ΔFIM認知（FIM認知変化量）",
+            "trueNodeId": "n4",
+            "falseNodeId": "leaf_neg2"
+          },
+          {
+            "id": "leaf_neg2",
+            "field": "",
+            "isLeaf": true,
+            "message": "退棟時歩行非自立（ΔFIM運動<12 & CBA≥18 & ΔFIM認知<1: 確信度70%）",
+            "operator": ">=",
+            "fieldLabel": "",
+            "isPositive": false
+          },
+          {
+            "id": "n4",
+            "field": "age",
+            "isLeaf": false,
+            "operator": "<",
+            "threshold": 67.5,
+            "fieldLabel": "年齢",
+            "trueNodeId": "leaf_pos2",
+            "falseNodeId": "leaf_neg3"
+          },
+          {
+            "id": "leaf_pos2",
+            "field": "",
+            "isLeaf": true,
+            "message": "退棟時歩行自立（ΔFIM運動<12 & CBA≥18 & ΔFIM認知≥1 & 年齢<67.5歳: 確信度75%）",
+            "operator": ">=",
+            "fieldLabel": "",
+            "isPositive": true
+          },
+          {
+            "id": "leaf_neg3",
+            "field": "",
+            "isLeaf": true,
+            "message": "退棟時歩行非自立（ΔFIM運動<12 & CBA≥18 & ΔFIM認知≥1 & 年齢≥67.5歳: 確信度65%）",
+            "operator": ">=",
+            "fieldLabel": "",
+            "isPositive": false
+          }
+        ]
+      },
+      "accuracy": null,
+      "sensitivity": 0.7829999923706055,
+      "specificity": 0.6919999718666077,
+      "auc": 0.7900000214576721,
+      "consensusEligible": true,
+      "isActive": true,
+      "sortOrder": 16,
+      "createdAt": "2026-05-11T09:11:53.000Z",
+      "updatedAt": "2026-06-13T22:35:11.000Z"
+    },
+    {
+      "id": 30008,
+      "outcomeId": 2,
+      "name": "退院時FIM運動項目予測 重回帰式",
+      "ruleType": "regression",
+      "source": "安部専之ら（2026）J-STAGE早期公開",
+      "sourceUrl": "https://www.jstage.jst.go.jp/article/rigaku/53/2/53_25-12662/_html/-char/ja",
+      "evidenceLevel": "Cohort Study",
+      "applyConditions": [],
+      "ruleDefinition": {
+        "type": "regression",
+        "formula": "fim_motor_discharge = fim_motor_admission * 0.97 + fim_cognitive_admission * 0.56 - age * 0.26 - days_onset_to_admission * 0.16 + 47.2",
+        "intercept": 47.2,
+        "threshold": 0,
+        "coefficients": [
+          {
+            "unit": "点",
+            "field": "fim_motor_total",
+            "fieldLabel": "入院時FIM運動項目合計",
+            "coefficient": 0.97
+          },
+          {
+            "unit": "点",
+            "field": "fim_cognitive_total",
+            "fieldLabel": "入院時FIM認知項目合計",
+            "coefficient": 0.56
+          },
+          {
+            "unit": "歳",
+            "field": "age",
+            "fieldLabel": "年齢",
+            "coefficient": -0.26
+          },
+          {
+            "unit": "日",
+            "field": "days_onset_to_admission",
+            "fieldLabel": "発症から入院までの日数",
+            "coefficient": -0.16
+          }
+        ],
+        "negativeMessage": "退院時FIM運動項目の予測値が低い（要介助の可能性）",
+        "positiveMessage": "退院時FIM運動項目の予測値が高い（自立度が高い）"
+      },
+      "accuracy": null,
+      "sensitivity": null,
+      "specificity": null,
+      "auc": null,
+      "consensusEligible": false,
+      "isActive": true,
+      "sortOrder": 17,
+      "createdAt": "2026-05-11T09:11:53.000Z",
+      "updatedAt": "2026-06-06T22:41:06.000Z"
+    },
+    {
+      "id": 60001,
+      "outcomeId": 3,
+      "name": "BBS入院時スコアによる地域歩行予測（≥29点）",
+      "ruleType": "cutoff",
+      "source": "Louie DR, Eng JJ (2018) J Rehabil Med 50: 37-44",
+      "sourceUrl": "https://doi.org/10.2340/16501977-2280",
+      "evidenceLevel": "Cohort Study",
+      "applyConditions": [
+        {
+          "field": "days_since_onset",
+          "label": "発症4週以内（入院リハビリ開始時）",
+          "value": 28,
+          "operator": "<="
+        }
+      ],
+      "ruleDefinition": {
+        "type": "cutoff",
+        "unit": "点",
+        "field": "bbs_score",
+        "notes": "対象: 入院リハビリ開始時（発症中央値19日）の脳卒中患者123名（カナダ）。4週間の入院リハビリ後の歩行能力を予測。多変量モデルでは脳卒中タイプ（脳出血 OR=0.19）と発症日数（OR=0.93）も有意な予測因子。",
+        "operator": ">=",
+        "threshold": 29,
+        "fieldLabel": "Berg Balance Scale（BBS）入院時スコア",
+        "negativeMessage": "退院時に地域歩行速度の達成は困難な可能性（BBS<29点）",
+        "positiveMessage": "退院時に地域歩行速度（≥0.8 m/s）を達成できる可能性が高い（BBS≥29点）"
+      },
+      "accuracy": null,
+      "sensitivity": 0.8600000143051147,
+      "specificity": 0.8399999737739563,
+      "auc": 0.8799999952316284,
+      "consensusEligible": true,
+      "isActive": true,
+      "sortOrder": 20,
+      "createdAt": "2026-05-11T09:13:16.000Z",
+      "updatedAt": "2026-05-11T09:14:48.000Z"
+    },
+    {
+      "id": 60002,
+      "outcomeId": 1,
+      "name": "BBS入院時スコアによる非補助歩行予測（非歩行者サブグループ, ≥12点）",
+      "ruleType": "cutoff",
+      "source": "Louie DR, Eng JJ (2018) J Rehabil Med 50: 37-44",
+      "sourceUrl": "https://doi.org/10.2340/16501977-2280",
+      "evidenceLevel": "Cohort Study",
+      "applyConditions": [
+        {
+          "field": "days_since_onset",
+          "label": "発症4週以内（入院リハビリ開始時）",
+          "value": 28,
+          "operator": "<="
+        }
+      ],
+      "ruleDefinition": {
+        "type": "cutoff",
+        "unit": "点",
+        "field": "bbs_score",
+        "notes": "対象: 入院時に非歩行者（5MWTを補助なしで完遂できない）のサブグループ n=84。BBS単独が有意な予測因子（OR=1.11, 95%CI: 1.05-1.17）。AUC=0.73（95%CI: 0.62-0.84）。",
+        "operator": ">=",
+        "threshold": 12,
+        "fieldLabel": "Berg Balance Scale（BBS）入院時スコア",
+        "negativeMessage": "4週間後も補助なし歩行の達成は困難な可能性（BBS<12点）",
+        "positiveMessage": "4週間の入院リハビリ後に補助なし歩行を達成できる可能性がある（BBS≥12点）"
+      },
+      "accuracy": null,
+      "sensitivity": 0.7400000095367432,
+      "specificity": 0.6800000071525574,
+      "auc": 0.7300000190734863,
+      "consensusEligible": true,
+      "isActive": true,
+      "sortOrder": 21,
+      "createdAt": "2026-05-11T09:13:16.000Z",
+      "updatedAt": "2026-05-11T09:14:48.000Z"
+    },
+    {
+      "id": 60003,
+      "outcomeId": 3,
+      "name": "TUGによる地域歩行予測（<14.77秒）",
+      "ruleType": "cutoff",
+      "source": "Lee GC et al. (2016) J Phys Ther Sci 28: 2184-2189",
+      "sourceUrl": "https://doi.org/10.1589/jpts.28.2184",
+      "evidenceLevel": "Other",
+      "applyConditions": [],
+      "ruleDefinition": {
+        "type": "cutoff",
+        "unit": "秒",
+        "field": "tug_seconds",
+        "notes": "対象: 脳卒中片麻痺患者75名（韓国）。地域歩行群（n=40）vs 限定的地域歩行群（n=35）の比較。ロジスティック回帰でOR=0.038（最も強い予測因子）。",
+        "operator": "<",
+        "threshold": 14.77,
+        "fieldLabel": "Timed Up and Go（TUG）テスト",
+        "negativeMessage": "地域歩行速度の達成は困難な可能性（TUG≥14.77秒）",
+        "positiveMessage": "地域歩行速度（>0.8 m/s）を達成できる可能性が高い（TUG<14.77秒）"
+      },
+      "accuracy": null,
+      "sensitivity": 0.9300000071525574,
+      "specificity": 0.7400000095367432,
+      "auc": 0.8799999952316284,
+      "consensusEligible": true,
+      "isActive": true,
+      "sortOrder": 22,
+      "createdAt": "2026-05-11T09:13:16.000Z",
+      "updatedAt": "2026-05-11T09:13:16.000Z"
+    },
+    {
+      "id": 60004,
+      "outcomeId": 3,
+      "name": "BBSによる地域歩行予測（>46.5点）",
+      "ruleType": "cutoff",
+      "source": "Lee GC et al. (2016) J Phys Ther Sci 28: 2184-2189",
+      "sourceUrl": "https://doi.org/10.1589/jpts.28.2184",
+      "evidenceLevel": "Other",
+      "applyConditions": [],
+      "ruleDefinition": {
+        "type": "cutoff",
+        "unit": "点",
+        "field": "bbs_score",
+        "notes": "AUC=0.80（中程度の精度）。ロジスティック回帰でOR=0.084。FMA>25.5点と組み合わせると精度向上の可能性。",
+        "operator": ">",
+        "threshold": 46.5,
+        "fieldLabel": "Berg Balance Scale（BBS）",
+        "negativeMessage": "地域歩行速度の達成は困難な可能性（BBS≤46.5点）",
+        "positiveMessage": "地域歩行速度（>0.8 m/s）を達成できる可能性が高い（BBS>46.5点）"
+      },
+      "accuracy": null,
+      "sensitivity": 0.699999988079071,
+      "specificity": 0.8199999928474426,
+      "auc": 0.800000011920929,
+      "consensusEligible": true,
+      "isActive": true,
+      "sortOrder": 23,
+      "createdAt": "2026-05-11T09:13:16.000Z",
+      "updatedAt": "2026-05-11T09:13:16.000Z"
+    },
+    {
+      "id": 60005,
+      "outcomeId": 3,
+      "name": "FMA下肢スコアによる地域歩行予測（>25.5点）",
+      "ruleType": "cutoff",
+      "source": "Lee GC et al. (2016) J Phys Ther Sci 28: 2184-2189",
+      "sourceUrl": "https://doi.org/10.1589/jpts.28.2184",
+      "evidenceLevel": "Other",
+      "applyConditions": [],
+      "ruleDefinition": {
+        "type": "cutoff",
+        "unit": "点（最大34点）",
+        "field": "fugl_meyer_lower",
+        "notes": "AUC=0.80。PPV=80%（陽性的中率が高い）。ロジスティック回帰でOR=0.053。",
+        "operator": ">",
+        "threshold": 25.5,
+        "fieldLabel": "Fugl-Meyer 下肢（FMA-LE）",
+        "negativeMessage": "地域歩行速度の達成は困難な可能性（FMA-LE≤25.5点）",
+        "positiveMessage": "地域歩行速度（>0.8 m/s）を達成できる可能性が高い（FMA-LE>25.5点）"
+      },
+      "accuracy": null,
+      "sensitivity": null,
+      "specificity": null,
+      "auc": 0.800000011920929,
+      "consensusEligible": true,
+      "isActive": true,
+      "sortOrder": 24,
+      "createdAt": "2026-05-11T09:13:16.000Z",
+      "updatedAt": "2026-05-11T09:17:43.000Z"
+    },
+    {
+      "id": 60006,
+      "outcomeId": 1,
+      "name": "脳卒中分類・FIM運動・FIM認知・要介護区分による決定木（退棟時歩行自立）",
+      "ruleType": "decision_tree",
+      "source": "妹尾祐太, 井上優（2022）理学療法科学",
+      "sourceUrl": "https://www.jstage.jst.go.jp/article/opta/3/1/3_16/_article/-char/ja",
+      "evidenceLevel": "Cohort Study",
+      "applyConditions": [],
+      "ruleDefinition": {
+        "type": "decision_tree",
+        "nodes": [
+          {
+            "id": "root",
+            "field": "stroke_type",
+            "operator": "equals",
+            "threshold": "脳出血",
+            "fieldLabel": "脳卒中分類",
+            "trueNodeId": "hemorrhage_fim",
+            "falseNodeId": "infarction_care"
+          },
+          {
+            "id": "hemorrhage_fim",
+            "unit": "点",
+            "field": "fim_motor_total",
+            "operator": ">",
+            "threshold": 47,
+            "fieldLabel": "入棟時FIM運動項目合計",
+            "trueNodeId": "leaf_hemorrhage_high",
+            "falseNodeId": "leaf_hemorrhage_low"
+          },
+          {
+            "id": "infarction_care",
+            "unit": "（要介護2以下）",
+            "field": "care_level",
+            "operator": "<=",
+            "threshold": 2,
+            "fieldLabel": "要介護認定区分",
+            "trueNodeId": "leaf_infarction_mild",
+            "falseNodeId": "infarction_cognitive"
+          },
+          {
+            "id": "infarction_cognitive",
+            "unit": "点",
+            "field": "fim_cognitive_total",
+            "operator": ">",
+            "threshold": 19,
+            "fieldLabel": "入棟時FIM認知項目合計",
+            "trueNodeId": "leaf_infarction_cognitive_high",
+            "falseNodeId": "leaf_infarction_cognitive_low"
+          },
+          {
+            "id": "leaf_hemorrhage_high",
+            "field": "",
+            "isLeaf": true,
+            "message": "脳出血 & FIM運動>47点 → 歩行自立率100%（n=13）",
+            "operator": "boolean",
+            "fieldLabel": "",
+            "isPositive": true,
+            "probability": 1
+          },
+          {
+            "id": "leaf_hemorrhage_low",
+            "field": "",
+            "isLeaf": true,
+            "message": "脳出血 & FIM運動≤47点 → 歩行自立率8.7%（n=2/23）",
+            "operator": "boolean",
+            "fieldLabel": "",
+            "isPositive": false,
+            "probability": 0.087
+          },
+          {
+            "id": "leaf_infarction_mild",
+            "field": "",
+            "isLeaf": true,
+            "message": "脳梗塞 & 要介護2以下 → 歩行自立率82.7%（n=43/52）",
+            "operator": "boolean",
+            "fieldLabel": "",
+            "isPositive": true,
+            "probability": 0.827
+          },
+          {
+            "id": "leaf_infarction_cognitive_high",
+            "field": "",
+            "isLeaf": true,
+            "message": "脳梗塞 & 要介護3以上 & FIM認知>19点 → 歩行自立率97.4%（n=37/38）",
+            "operator": "boolean",
+            "fieldLabel": "",
+            "isPositive": true,
+            "probability": 0.974
+          },
+          {
+            "id": "leaf_infarction_cognitive_low",
+            "field": "",
+            "isLeaf": true,
+            "message": "脳梗塞 & 要介護3以上 & FIM認知≤19点 → 歩行自立率42.9%（n=6/14）",
+            "operator": "boolean",
+            "fieldLabel": "",
+            "isPositive": false,
+            "probability": 0.429
+          }
+        ],
+        "notes": "対象: 回復期リハビリテーション病棟入棟患者（n=127）。正診率89.5%（95%CI: 82.0-94.7）、感度83.3%、特異度97.8%、AUC=0.918（95%CI: 0.862-0.974）。",
+        "description": "CART（Classification and Regression Tree）分析による決定木。入棟時情報から退棟時の歩行自立（FIM歩行項目6点以上）を予測する。"
+      },
+      "accuracy": 0.8949999809265137,
+      "sensitivity": 0.8330000042915344,
+      "specificity": 0.9779999852180481,
+      "auc": 0.9179999828338623,
+      "consensusEligible": true,
+      "isActive": true,
+      "sortOrder": 25,
+      "createdAt": "2026-05-11T09:13:16.000Z",
+      "updatedAt": "2026-06-13T22:41:31.000Z"
+    },
+    {
+      "id": 60007,
+      "outcomeId": 1,
+      "name": "重度片麻痺患者の良好な機能回復予測（年齢・病型・皮質病変）",
+      "ruleType": "composite_rule",
+      "source": "Kurosaki M, Tosaka M et al. (2022) J Jpn Assoc Rehabil Med",
+      "sourceUrl": "https://www.jstage.jst.go.jp/article/prm/7/0/7_20220039/_article",
+      "evidenceLevel": "Cohort Study",
+      "applyConditions": [
+        {
+          "field": "brunnstrom_lower",
+          "label": "BRS下肢I〜II（重度片麻痺）",
+          "value": 2,
+          "operator": "<="
+        }
+      ],
+      "ruleDefinition": {
+        "root": {
+          "logic": "AND",
+          "children": [
+            {
+              "unit": "歳",
+              "field": "age",
+              "logic": "CONDITION",
+              "value": 70,
+              "operator": "<",
+              "fieldLabel": "年齢"
+            },
+            {
+              "field": "stroke_type",
+              "logic": "CONDITION",
+              "value": "脳出血",
+              "operator": "==",
+              "fieldLabel": "病型"
+            },
+            {
+              "field": "cortical_lesion",
+              "logic": "CONDITION",
+              "value": false,
+              "operator": "==",
+              "fieldLabel": "皮質病変の有無"
+            }
+          ]
+        },
+        "type": "composite_rule",
+        "negativeMessage": "機能回復は限定的な可能性（重度片麻痺患者の24%のみFIM≥100達成）",
+        "positiveMessage": "良好な機能回復（FIM≥100または在宅復帰）の可能性がある（年齢<70歳 & 脳出血 & 皮質病変なし）"
+      },
+      "accuracy": null,
+      "sensitivity": null,
+      "specificity": null,
+      "auc": null,
+      "consensusEligible": true,
+      "isActive": true,
+      "sortOrder": 26,
+      "createdAt": "2026-05-11T09:13:16.000Z",
+      "updatedAt": "2026-06-13T22:42:54.000Z"
+    },
+    {
+      "id": 60008,
+      "outcomeId": 1,
+      "name": "半側空間無視と認知障害の複合が歩行自立回復に与える影響",
+      "ruleType": "composite_rule",
+      "source": "Kimura Y, Yamada M et al. J Rehabil Med",
+      "sourceUrl": "https://pubmed.ncbi.nlm.nih.gov/30406267/",
+      "evidenceLevel": "Cohort Study",
+      "applyConditions": [],
+      "ruleDefinition": {
+        "root": {
+          "child": {
+            "logic": "AND",
+            "children": [
+              {
+                "field": "spatial_neglect",
+                "logic": "CONDITION",
+                "value": true,
+                "operator": "==",
+                "fieldLabel": "半側空間無視"
+              },
+              {
+                "field": "mmse_score",
+                "logic": "CONDITION",
+                "value": 24,
+                "operator": "<",
+                "fieldLabel": "MMSE（認知機能）"
+              }
+            ]
+          },
+          "logic": "NOT"
+        },
+        "type": "composite_rule",
+        "negativeMessage": "USN+認知障害の合併 → 歩行自立困難リスク高（自立率10%、OR=5.55）",
+        "positiveMessage": "USN+認知障害の合併なし → 歩行自立の可能性あり（USN単独では有意な関連なし）"
+      },
+      "accuracy": null,
+      "sensitivity": null,
+      "specificity": null,
+      "auc": null,
+      "consensusEligible": true,
+      "isActive": true,
+      "sortOrder": 27,
+      "createdAt": "2026-05-11T09:13:16.000Z",
+      "updatedAt": "2026-06-13T22:46:48.000Z"
+    },
+    {
+      "id": 60009,
+      "outcomeId": 1,
+      "name": "非歩行者の歩行自立予測因子（メタ解析: 座位保持・ADL・下肢筋力等）",
+      "ruleType": "scoring_system",
+      "source": "Preston E et al. (2021) Stroke 52: 1818-1828",
+      "sourceUrl": "https://pubmed.ncbi.nlm.nih.gov/34238016/",
+      "evidenceLevel": "Systematic Review",
+      "applyConditions": [
+        {
+          "field": "walking_status",
+          "label": "入院時非歩行者（5MWTを補助なしで完遂不可）",
+          "value": "非歩行",
+          "operator": "=="
+        }
+      ],
+      "ruleDefinition": {
+        "type": "scoring_system",
+        "items": [
+          {
+            "unit": "boolean",
+            "bands": [
+              {
+                "label": "座位保持良好",
+                "score": 1,
+                "value": true,
+                "operator": "equals"
+              },
+              {
+                "label": "座位保持不良",
+                "score": 0,
+                "value": false,
+                "operator": "equals"
+              }
+            ],
+            "field": "sitting_balance_30s",
+            "notes": "3ヶ月後OR=7.9, 6ヶ月後OR=19.1（最も強い予測因子の一つ）",
+            "fieldLabel": "座位保持30秒（30秒以上）",
+            "oddsRatio3m": 7.9,
+            "oddsRatio6m": 19.1
+          },
+          {
+            "unit": "boolean",
+            "bands": [
+              {
+                "label": "ADL自立",
+                "score": 1,
+                "value": true,
+                "operator": "equals"
+              },
+              {
+                "label": "ADL依存",
+                "score": 0,
+                "value": false,
+                "operator": "equals"
+              }
+            ],
+            "field": "adl_independence",
+            "notes": "3ヶ月後OR=10.5（最も強い予測因子）",
+            "fieldLabel": "ADL自立（良好）",
+            "oddsRatio3m": 10.5,
+            "oddsRatio6m": null
+          },
+          {
+            "unit": "boolean",
+            "bands": [
+              {
+                "label": "下肢筋力良好",
+                "score": 1,
+                "value": true,
+                "operator": "equals"
+              },
+              {
+                "label": "下肢筋力低下",
+                "score": 0,
+                "value": false,
+                "operator": "equals"
+              }
+            ],
+            "field": "leg_strength_good",
+            "notes": "3ヶ月後OR=5.0",
+            "fieldLabel": "下肢筋力良好",
+            "oddsRatio3m": 5
+          },
+          {
+            "unit": "boolean",
+            "bands": [
+              {
+                "label": "認知障害なし",
+                "score": 1,
+                "value": false,
+                "operator": "equals"
+              },
+              {
+                "label": "認知障害あり",
+                "score": 0,
+                "value": true,
+                "operator": "equals"
+              }
+            ],
+            "field": "cognitive_impairment",
+            "notes": "3ヶ月後OR=3.3",
+            "fieldLabel": "認知障害なし",
+            "oddsRatio3m": 3.3
+          },
+          {
+            "unit": "歳",
+            "bands": [
+              {
+                "label": "<70歳",
+                "score": 1,
+                "value": 70,
+                "operator": "<"
+              },
+              {
+                "label": "≥70歳",
+                "score": 0,
+                "value": 70,
+                "operator": ">="
+              }
+            ],
+            "field": "age",
+            "notes": "3ヶ月後OR=3.4, 6ヶ月後OR=2.1",
+            "fieldLabel": "若年齢（<70歳）",
+            "oddsRatio3m": 3.4,
+            "oddsRatio6m": 2.1
+          },
+          {
+            "unit": "boolean",
+            "bands": [
+              {
+                "label": "失禁なし",
+                "score": 1,
+                "value": true,
+                "operator": "equals"
+              },
+              {
+                "label": "失禁あり",
+                "score": 0,
+                "value": false,
+                "operator": "equals"
+              }
+            ],
+            "field": "continence",
+            "notes": "3ヶ月後OR=2.3, 6ヶ月後OR=13.8（6ヶ月後に特に重要）",
+            "fieldLabel": "失禁なし",
+            "oddsRatio3m": 2.3,
+            "oddsRatio6m": 13.8
+          },
+          {
+            "unit": "boolean",
+            "bands": [
+              {
+                "label": "無視なし",
+                "score": 1,
+                "value": false,
+                "operator": "equals"
+              },
+              {
+                "label": "無視あり",
+                "score": 0,
+                "value": true,
+                "operator": "equals"
+              }
+            ],
+            "field": "spatial_neglect",
+            "notes": "3ヶ月後OR=2.4",
+            "fieldLabel": "半側空間無視なし",
+            "oddsRatio3m": 2.4
+          }
+        ],
+        "notes": "発症早期の非歩行者を対象とした系統的レビュー＆メタ解析（n=18研究）。座位保持とADL自立が最も強い予測因子。皮質脊髄路の保存（OR=8.3）も重要だが画像評価が必要。",
+        "maxScore": 7,
+        "threshold": 5,
+        "description": "発症早期の非歩行者における3・6ヶ月後の歩行自立予測因子のメタ解析。各因子の存在（1点）/欠如（0点）でスコアリングし、リスク評価を行う。",
+        "negativeMessage": "歩行自立の予後不良因子が多い（スコア<5点）",
+        "positiveMessage": "歩行自立の予後良好因子が多い（スコア≥5点）"
+      },
+      "accuracy": null,
+      "sensitivity": null,
+      "specificity": null,
+      "auc": null,
+      "consensusEligible": true,
+      "isActive": true,
+      "sortOrder": 28,
+      "createdAt": "2026-05-11T09:13:16.000Z",
+      "updatedAt": "2026-06-13T22:55:40.000Z"
+    }
+  ]
+}
