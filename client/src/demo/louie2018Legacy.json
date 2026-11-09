@@ -1,0 +1,76 @@
+[
+  {
+    "id": 60001,
+    "outcomeId": 3,
+    "name": "BBS入院時スコアによる地域歩行予測（≥29点）",
+    "ruleType": "cutoff",
+    "source": "Louie DR, Eng JJ (2018) J Rehabil Med 50: 37-44",
+    "sourceUrl": "https://doi.org/10.2340/16501977-2280",
+    "evidenceLevel": "Cohort Study",
+    "applyConditions": [
+      {
+        "field": "days_since_onset",
+        "label": "発症4週以内（入院リハビリ開始時）",
+        "value": 28,
+        "operator": "<="
+      }
+    ],
+    "ruleDefinition": {
+      "type": "cutoff",
+      "unit": "点",
+      "field": "bbs_score",
+      "notes": "対象: 入院リハビリ開始時（発症中央値19日）の脳卒中患者123名（カナダ）。4週間の入院リハビリ後の歩行能力を予測。多変量モデルでは脳卒中タイプ（脳出血 OR=0.19）と発症日数（OR=0.93）も有意な予測因子。",
+      "operator": ">=",
+      "threshold": 29,
+      "fieldLabel": "Berg Balance Scale（BBS）入院時スコア",
+      "negativeMessage": "退院時に地域歩行速度の達成は困難な可能性（BBS<29点）",
+      "positiveMessage": "退院時に地域歩行速度（≥0.8 m/s）を達成できる可能性が高い（BBS≥29点）"
+    },
+    "accuracy": null,
+    "sensitivity": 0.8600000143051147,
+    "specificity": 0.8399999737739563,
+    "auc": 0.8799999952316284,
+    "consensusEligible": true,
+    "isActive": true,
+    "sortOrder": 20,
+    "createdAt": "2026-05-11T09:13:16.000Z",
+    "updatedAt": "2026-05-11T09:14:48.000Z"
+  },
+  {
+    "id": 60002,
+    "outcomeId": 1,
+    "name": "BBS入院時スコアによる非補助歩行予測（非歩行者サブグループ, ≥12点）",
+    "ruleType": "cutoff",
+    "source": "Louie DR, Eng JJ (2018) J Rehabil Med 50: 37-44",
+    "sourceUrl": "https://doi.org/10.2340/16501977-2280",
+    "evidenceLevel": "Cohort Study",
+    "applyConditions": [
+      {
+        "field": "days_since_onset",
+        "label": "発症4週以内（入院リハビリ開始時）",
+        "value": 28,
+        "operator": "<="
+      }
+    ],
+    "ruleDefinition": {
+      "type": "cutoff",
+      "unit": "点",
+      "field": "bbs_score",
+      "notes": "対象: 入院時に非歩行者（5MWTを補助なしで完遂できない）のサブグループ n=84。BBS単独が有意な予測因子（OR=1.11, 95%CI: 1.05-1.17）。AUC=0.73（95%CI: 0.62-0.84）。",
+      "operator": ">=",
+      "threshold": 12,
+      "fieldLabel": "Berg Balance Scale（BBS）入院時スコア",
+      "negativeMessage": "4週間後も補助なし歩行の達成は困難な可能性（BBS<12点）",
+      "positiveMessage": "4週間の入院リハビリ後に補助なし歩行を達成できる可能性がある（BBS≥12点）"
+    },
+    "accuracy": null,
+    "sensitivity": 0.7400000095367432,
+    "specificity": 0.6800000071525574,
+    "auc": 0.7300000190734863,
+    "consensusEligible": true,
+    "isActive": true,
+    "sortOrder": 21,
+    "createdAt": "2026-05-11T09:13:16.000Z",
+    "updatedAt": "2026-05-11T09:14:48.000Z"
+  }
+]

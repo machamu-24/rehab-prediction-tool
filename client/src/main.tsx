@@ -6,7 +6,6 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
-import { demoLink } from "./demo/demoLink";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -56,9 +55,10 @@ queryClient.getMutationCache().subscribe(event => {
 
 const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
 
+async function startApp() {
 const trpcClient = trpc.createClient({
   links: isDemoMode
-    ? [demoLink()]
+    ? [(await import("./demo/demoLink")).demoLink()]
     : [
         httpBatchLink({
           url: "/api/trpc",
@@ -73,7 +73,7 @@ const trpcClient = trpc.createClient({
       ],
 });
 
-registerAnalytics();
+if (isDemoMode) registerAnalytics();
 
 createRoot(document.getElementById("root")!).render(
   <trpc.Provider client={trpcClient} queryClient={queryClient}>
@@ -82,3 +82,6 @@ createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </trpc.Provider>
 );
+
+}
+void startApp();

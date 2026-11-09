@@ -1,0 +1,54 @@
+{
+  "type": "composite_rule",
+  "root": {
+    "logic": "AND",
+    "children": [
+      {
+        "logic": "CONDITION",
+        "field": "bbs_score",
+        "operator": ">=",
+        "value": 20
+      },
+      {
+        "logic": "OR",
+        "children": [
+          {
+            "logic": "CONDITION",
+            "field": "mmse_score",
+            "operator": ">=",
+            "value": 24
+          },
+          {
+            "logic": "NOT",
+            "child": {
+              "logic": "CONDITION",
+              "field": "diabetes",
+              "operator": "boolean"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "positiveMessage": "QA：支持",
+  "negativeMessage": "QA：困難示唆",
+  "timeline": {
+    "version": 1,
+    "anchor": "stroke_onset",
+    "kind": "future",
+    "evaluation": {
+      "value": 30,
+      "unit": "day",
+      "precision": "exact",
+      "originalText": "架空仕様：発症後30日",
+      "basis": "手動UI試験のための合成仕様。臨床利用不可。"
+    },
+    "target": {
+      "value": 90,
+      "unit": "day",
+      "precision": "exact",
+      "originalText": "架空仕様：発症後90日",
+      "basis": "手動UI試験のための合成仕様。臨床利用不可。"
+    }
+  }
+}

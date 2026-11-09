@@ -1,3 +1,14 @@
+import { isConsensusResult, readContinuousOutput } from "../shared/resultStatus";
+import { getRuleExclusionReason } from "../shared/ruleAvailability";
+import {
+  matchTimeline,
+  type TimeQuery,
+  type TimeMatch,
+  readTimeline,
+  type LiteratureTimeline,
+} from "../shared/literatureTimeline";
+import { patientInputsSchema } from "../shared/patientValidation";
+import { koyamaInputReason, koyamaResultTimeline, matchKoyamaTime } from "../shared/koyama";
 /**
  * 文献ベースルールエンジン
  *
@@ -6,10 +17,17 @@
  *   2. decision_tree   - 決定木
  *   3. regression      - 重回帰式
  *   4. scoring_system  - スコアリングシステム
- *   5. nomogram        - ノモグラム（ロジスティック回帰ベース確率算出）
+ *   5. logistic_regression - ロジスティック回帰（確率算出）
+ *      nomogram        - ノモグラム（ロジスティック回帰ベース確率算出）
  *   6. composite_rule  - 複合条件（AND/OR/NOT）
  *   7. custom_formula  - カスタム数式
  */
+
+import {
+  applyConditionSchema,
+  validateRuleDefinition,
+} from "../shared/ruleValidation";
+import { evaluateFormula } from "./formula";
 
 import type {
   LiteratureRule,
@@ -22,6 +40,7 @@ import type {
   RegressionRuleDefinition,
   ScoringSystemRuleDefinition,
   NomogramRuleDefinition,
+  LogisticRegressionRuleDefinition,
   CompositeRuleDefinition,
   LogicNode,
   CustomFormulaRuleDefinition,
@@ -31,7 +50,22 @@ import type {
 // 出力型定義
 // ============================================================
 
+export type EvaluationStatus =
+  | "evaluated"
+  | "missing_input"
+  | "outside"
+  | "unsupported"
+  | "invalid_definition"
+  | "calculation_error";
+
 export type RuleEvaluationResult = {
+  timeline?: LiteratureTimeline | null;
+  timeMatch?: TimeMatch;
+  status: EvaluationStatus;
+  missingFields: string[];
+  numericValue: number | null;
+  outputMode?: "continuous";
+  outputUnit?: string | null;
   ruleId: number;
   ruleName: string;
   ruleType: string;
@@ -61,8 +95,8 @@ export type LiteratureSummary = {
 };
 
 export type ConsensusAnalysis = {
-  score: number;
-  label: "positive" | "neutral" | "negative";
+  score: number | null;
+  label: "positive" | "neutral" | "negative" | "unavailable";
   positiveCount: number;
   negativeCount: number;
   totalEligible: number;
@@ -92,7 +126,14 @@ function getVal(inputs: PatientInputs, field: string): unknown {
 }
 
 function numVal(inputs: PatientInputs, field: string): number {
-  return Number(inputs[field] ?? 0);
+  const value = inputs[field];
+  if (
+    (typeof value !== "number" && typeof value !== "boolean") ||
+    !Number.isFinite(Number(value))
+  ) {
+    throw new Error(`項目「${field}」には有限の数値が必要です`);
+  }
+  return Number(value);
 }
 
 function compareOp(
@@ -100,19 +141,39 @@ function compareOp(
   operator: string,
   threshold: number | string | boolean | undefined
 ): boolean {
+  if (
+    ["<=", ">=", "<", ">"].includes(operator) &&
+    ((typeof val !== "number" && typeof val !== "boolean") ||
+      !Number.isFinite(Number(val)) ||
+      (typeof threshold !== "number" && typeof threshold !== "boolean") ||
+      !Number.isFinite(Number(threshold)))
+  ) {
+    throw new Error("比較する値の型・範囲が不正です");
+  }
+  if (operator.startsWith("boolean") && typeof val !== "boolean")
+    throw new Error("有無の入力が不正です");
   const n = Number(val);
   const t = Number(threshold);
   switch (operator) {
-    case "<=": return n <= t;
-    case ">=": return n >= t;
-    case "<":  return n < t;
-    case ">":  return n > t;
+    case "<=":
+      return n <= t;
+    case ">=":
+      return n >= t;
+    case "<":
+      return n < t;
+    case ">":
+      return n > t;
     case "equals":
-    case "==": return val == threshold;
-    case "!=": return val != threshold;
-    case "boolean": return Boolean(val);
-    case "boolean_negative": return !Boolean(val);
-    default:   return false;
+    case "==":
+      return val === threshold;
+    case "!=":
+      return val !== threshold;
+    case "boolean":
+      return Boolean(val);
+    case "boolean_negative":
+      return !Boolean(val);
+    default:
+      throw new Error("未対応の比較演算子です");
   }
 }
 
@@ -144,33 +205,43 @@ function checkApplyConditions(
 /**
  * ルール定義から必要フィールドを抽出する（外部公開用ラッパー）
  */
-export function extractRequiredFieldsFromDef(def: RuleDefinition | null | undefined): string[] {
+export function extractRequiredFieldsFromDef(
+  def: RuleDefinition | null | undefined
+): string[] {
   if (!def) return [];
-  return extractRequiredFields(def);
+  try {
+    return extractRequiredFields(def);
+  } catch {
+    return [];
+  }
 }
 function extractRequiredFields(def: RuleDefinition): string[] {
   switch (def.type) {
     case "cutoff": {
       const fields = [def.field];
-      if (def.secondaryConditions) fields.push(...def.secondaryConditions.map((c) => c.field));
+      if (def.secondaryConditions)
+        fields.push(...def.secondaryConditions.map(c => c.field));
       return fields;
     }
     case "decision_tree": {
       if (!Array.isArray(def.nodes)) return [];
-      const fieldSet = new Set(def.nodes.filter((n) => !n.isLeaf).map((n) => n.field));
+      const fieldSet = new Set(
+        def.nodes.filter(n => !n.isLeaf).map(n => n.field)
+      );
       return Array.from(fieldSet);
     }
     case "regression":
-      return def.coefficients.map((c) => c.field);
+      return def.coefficients.map(c => c.field);
     case "scoring_system":
-      return def.items.map((i) => i.field);
+      return def.items.map(i => i.field);
+    case "logistic_regression":
     case "nomogram":
-      return def.variables.map((v) => v.field);
+      return def.variables.map(v => v.field);
     case "composite_rule":
       if (!def.root) return [];
       return extractFieldsFromLogicNode(def.root);
     case "custom_formula":
-      return def.variables.map((v) => v.field);
+      return def.variables.map(v => v.field);
     default:
       return [];
   }
@@ -190,36 +261,49 @@ type RuleDefinitionMetadata = RuleDefinition & {
 };
 
 function textOrNull(value: unknown): string | null {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : null;
 }
 
 function uniqueNonEmpty(values: string[]): string[] {
-  return Array.from(new Set(values.map((v) => v.trim()).filter(Boolean)));
+  return Array.from(new Set(values.map(v => v.trim()).filter(Boolean)));
 }
 
 function extractPredictorLabels(def: RuleDefinition): string[] {
   switch (def.type) {
     case "cutoff":
       return uniqueNonEmpty([
-        def.fieldLabel,
-        ...(def.secondaryConditions?.map((c) => c.fieldLabel) ?? []),
+        def.fieldLabel || def.field,
+        ...(def.secondaryConditions?.map(c => c.fieldLabel || c.field) ?? []),
       ]);
     case "decision_tree":
       return uniqueNonEmpty(
         def.nodes
-          .filter((node) => !node.isLeaf)
-          .map((node) => node.fieldLabel || node.field)
+          .filter(node => !node.isLeaf)
+          .map(node => node.fieldLabel || node.field)
       );
     case "regression":
-      return uniqueNonEmpty(def.coefficients.map((coef) => coef.fieldLabel || coef.field));
+      return uniqueNonEmpty(
+        def.coefficients.map(coef => coef.fieldLabel || coef.field)
+      );
     case "scoring_system":
-      return uniqueNonEmpty(def.items.map((item) => item.fieldLabel || item.field));
+      return uniqueNonEmpty(
+        def.items.map(item => item.fieldLabel || item.field)
+      );
+    case "logistic_regression":
     case "nomogram":
-      return uniqueNonEmpty(def.variables.map((variable) => variable.fieldLabel || variable.field));
+      return uniqueNonEmpty(
+        def.variables.map(variable => variable.fieldLabel || variable.field)
+      );
     case "composite_rule":
-      return def.root ? uniqueNonEmpty(extractLabelsFromLogicNode(def.root)) : [];
+      return def.root
+        ? uniqueNonEmpty(extractLabelsFromLogicNode(def.root))
+        : [];
     case "custom_formula":
-      return uniqueNonEmpty(def.variables.map((variable) => variable.fieldLabel || variable.field));
+      return uniqueNonEmpty(
+        def.variables.map(variable => variable.fieldLabel || variable.field)
+      );
     default:
       return [];
   }
@@ -231,7 +315,10 @@ function extractLabelsFromLogicNode(node: LogicNode): string[] {
   return node.children.flatMap(extractLabelsFromLogicNode);
 }
 
-function buildFallbackOverview(rule: LiteratureRule, def: RuleDefinition): string {
+function buildFallbackOverview(
+  rule: LiteratureRule,
+  def: RuleDefinition
+): string {
   switch (def.type) {
     case "cutoff":
       return `${def.fieldLabel}のカットオフ値を用いて、${rule.name}を判定する文献ルールです。`;
@@ -241,6 +328,8 @@ function buildFallbackOverview(rule: LiteratureRule, def: RuleDefinition): strin
       return "複数の評価項目を回帰式に代入して判定する文献ルールです。";
     case "scoring_system":
       return "複数の評価項目を点数化し、合計点で判定する文献ルールです。";
+    case "logistic_regression":
+      return "複数の評価項目をロジスティック回帰式に代入し、確率を推定する文献ルールです。";
     case "nomogram":
       return "複数の評価項目から確率や時期を推定するノモグラム型の文献ルールです。";
     case "composite_rule":
@@ -252,7 +341,10 @@ function buildFallbackOverview(rule: LiteratureRule, def: RuleDefinition): strin
   }
 }
 
-function extractTargetPopulation(notes: string | null): { targetPopulation: string | null; clinicalNote: string | null } {
+function extractTargetPopulation(notes: string | null): {
+  targetPopulation: string | null;
+  clinicalNote: string | null;
+} {
   if (!notes) return { targetPopulation: null, clinicalNote: null };
   const match = notes.match(/対象[:：]\s*[^。]+。?/);
   if (!match) return { targetPopulation: null, clinicalNote: notes };
@@ -261,12 +353,16 @@ function extractTargetPopulation(notes: string | null): { targetPopulation: stri
   return { targetPopulation, clinicalNote };
 }
 
-function buildLiteratureSummary(rule: LiteratureRule, def: RuleDefinition): LiteratureSummary {
+function buildLiteratureSummary(
+  rule: LiteratureRule,
+  def: RuleDefinition
+): LiteratureSummary {
   const metadata = def as RuleDefinitionMetadata;
   const notes = textOrNull(metadata.notes);
   const { targetPopulation, clinicalNote } = extractTargetPopulation(notes);
   return {
-    overview: textOrNull(metadata.description) ?? buildFallbackOverview(rule, def),
+    overview:
+      textOrNull(metadata.description) ?? buildFallbackOverview(rule, def),
     targetPopulation,
     predictors: extractPredictorLabels(def),
     clinicalNote,
@@ -284,15 +380,34 @@ function buildMatchExplanation(evalResult: EvalResult): string[] {
 // 各ルールタイプの評価関数
 // ============================================================
 
+class MissingInputError extends Error {
+  constructor(public fields: string[]) {
+    super(`必要な入力項目が未入力です: ${fields.join(", ")}`);
+  }
+}
+
+function requireInput(inputs: PatientInputs, field: string) {
+  if (
+    inputs[field] === undefined ||
+    inputs[field] === null ||
+    inputs[field] === ""
+  )
+    throw new MissingInputError([field]);
+}
+
 type EvalResult = {
-  isPositive: boolean;
+  numericValue?: number;
+  isPositive: boolean | null;
   prediction: string;
   probability: number | null;
   details: string[];
 };
 
 // ---- 1. カットオフ値 ----
-function evalCutoff(def: CutoffRuleDefinition, inputs: PatientInputs): EvalResult {
+function evalCutoff(
+  def: CutoffRuleDefinition,
+  inputs: PatientInputs
+): EvalResult {
   const v = getVal(inputs, def.field);
   const primaryPass = compareOp(v, def.operator, def.threshold);
   const unit = def.unit ?? "";
@@ -313,46 +428,91 @@ function evalCutoff(def: CutoffRuleDefinition, inputs: PatientInputs): EvalResul
   }
 
   const isPositive = primaryPass && secondaryPass;
-  return { isPositive, prediction: isPositive ? def.positiveMessage : def.negativeMessage, probability: null, details };
+  return {
+    isPositive,
+    prediction: isPositive ? def.positiveMessage : def.negativeMessage,
+    probability: null,
+    details,
+  };
 }
 
 // ---- 2. 決定木 ----
-function evalDecisionTree(def: DecisionTreeRuleDefinition, inputs: PatientInputs): EvalResult {
+function evalDecisionTree(
+  def: DecisionTreeRuleDefinition,
+  inputs: PatientInputs
+): EvalResult {
   if (!Array.isArray(def.nodes) || def.nodes.length === 0) {
-    return { isPositive: false, prediction: "評価不能（ノード定義なし）", probability: null, details: [] };
+    throw new Error("決定木のノードがありません");
   }
-  const nodeMap = new Map<string, DecisionTreeNode>(def.nodes.map((n) => [n.id, n]));
+  const nodeMap = new Map<string, DecisionTreeNode>(
+    def.nodes.map(n => [n.id, n])
+  );
   const rootNode = def.nodes[0];
   if (!rootNode) {
-    return { isPositive: false, prediction: "評価不能（ノード定義なし）", probability: null, details: [] };
+    throw new Error("決定木のノードがありません");
   }
 
   const details: string[] = [];
   let current: DecisionTreeNode | undefined = rootNode;
 
+  const visited = new Set<string>();
   while (current && !current.isLeaf) {
+    if (visited.has(current.id)) throw new Error("決定木に循環があります");
+    visited.add(current.id);
+    requireInput(inputs, current.field);
     const v: unknown = getVal(inputs, current.field);
     const pass = compareOp(v, current.operator, current.threshold);
     details.push(
       `${current.fieldLabel}: ${v} ${current.operator} ${current.threshold ?? ""}→ ${pass ? "Yes" : "No"}`
     );
-    const nextId: string | undefined = pass ? current.trueNodeId : current.falseNodeId;
+    const nextId: string | undefined = pass
+      ? current.trueNodeId
+      : current.falseNodeId;
     current = nextId ? nodeMap.get(nextId) : undefined;
   }
 
   if (current?.isLeaf) {
+    if (def.outputMode === "classified") {
+      details.push(
+        current.isPositive === null
+          ? "研究内の該当群で自立者・非自立者が同数のため判定保留です。支持・困難の集計には含めません。"
+          : "研究内の該当群で人数が多い側を支持／困難として集計します。群別割合は患者個人の予測確率ではありません。"
+      );
+      return {
+        isPositive: current.isPositive ?? null,
+        prediction: current.message!,
+        probability: null,
+        details,
+      };
+    }
+    if (def.outputMode === "descriptive") {
+      details.push(
+        "原著の該当群で観測された割合です。患者個人の確率・二値判定には変換していません。"
+      );
+      return {
+        isPositive: null,
+        prediction: current.message!,
+        probability: null,
+        details,
+      };
+    }
     return {
       isPositive: current.isPositive ?? false,
-      prediction: current.message ?? (current.isPositive ? "陽性（自立寄り）" : "陰性（困難寄り）"),
+      prediction:
+        current.message ??
+        (current.isPositive ? "陽性（自立寄り）" : "陰性（困難寄り）"),
       probability: null,
       details,
     };
   }
-  return { isPositive: false, prediction: "評価不能（ツリー終端なし）", probability: null, details };
+  throw new Error("決定木の終端がありません");
 }
 
 // ---- 3. 重回帰式 ----
-function evalRegression(def: RegressionRuleDefinition, inputs: PatientInputs): EvalResult {
+function evalRegression(
+  def: RegressionRuleDefinition,
+  inputs: PatientInputs
+): EvalResult {
   let score = def.intercept;
   const details: string[] = [`切片: ${def.intercept}`];
   for (const coef of def.coefficients) {
@@ -363,20 +523,36 @@ function evalRegression(def: RegressionRuleDefinition, inputs: PatientInputs): E
       `${coef.fieldLabel}${coef.unit ? `（${coef.unit}）` : ""}: ${v} × ${coef.coefficient} = ${contrib.toFixed(3)}`
     );
   }
-  const outputRange = (def as RegressionRuleDefinition & { outputRange?: [number, number] }).outputRange;
-  const threshold =
-    typeof def.threshold === "number"
-      ? def.threshold
-      : Array.isArray(outputRange)
-        ? (outputRange[0] + outputRange[1]) / 2
-        : 0;
+  if (!Number.isFinite(score))
+    throw new Error("回帰式の計算結果が有限の数値ではありません");
+  if (def.outputMode === "continuous") {
+    const prediction = `予測値: ${score.toFixed(2)}${def.outputUnit ?? ""}`;
+    details.push(prediction);
+    return {
+      isPositive: null,
+      prediction,
+      probability: null,
+      numericValue: score,
+      details,
+    };
+  }
+  const threshold = def.threshold!;
   details.push(`予測値: ${score.toFixed(3)}（判定閾値: ${threshold}）`);
   const isPositive = score >= threshold;
-  return { isPositive, prediction: isPositive ? def.positiveMessage : def.negativeMessage, probability: null, details };
+  return {
+    isPositive,
+    prediction: (isPositive ? def.positiveMessage : def.negativeMessage)!,
+    probability: null,
+    numericValue: score,
+    details,
+  };
 }
 
 // ---- 4. スコアリングシステム ----
-function evalScoringSystem(def: ScoringSystemRuleDefinition, inputs: PatientInputs): EvalResult {
+function evalScoringSystem(
+  def: ScoringSystemRuleDefinition,
+  inputs: PatientInputs
+): EvalResult {
   let total = 0;
   const details: string[] = [];
   for (const item of def.items) {
@@ -394,54 +570,98 @@ function evalScoringSystem(def: ScoringSystemRuleDefinition, inputs: PatientInpu
       }
     }
     if (!matched) {
-      details.push(`${item.fieldLabel}: ${v} → 該当区間なし（0点）`);
+      throw new Error(`項目「${item.field}」に該当する点数区間がありません`);
     }
   }
-  details.push(`合計スコア: ${total}点 / ${def.maxScore}点（閾値: ${def.threshold}点）`);
+  if (!Number.isFinite(total))
+    throw new Error("合計スコアが有限の数値ではありません");
+  details.push(
+    `合計スコア: ${total}点 / ${def.maxScore}点（閾値: ${def.threshold}点）`
+  );
   const isPositive = total >= def.threshold;
-  return { isPositive, prediction: isPositive ? def.positiveMessage : def.negativeMessage, probability: null, details };
+  return {
+    isPositive,
+    prediction: isPositive ? def.positiveMessage : def.negativeMessage,
+    probability: null,
+    details,
+  };
 }
 
-// ---- 5. ノモグラム ----
-function evalNomogram(def: NomogramRuleDefinition, inputs: PatientInputs): EvalResult {
+// ---- 5. ロジスティック回帰・対応するノモグラム ----
+function evalLogisticModel(
+  def: NomogramRuleDefinition | LogisticRegressionRuleDefinition,
+  inputs: PatientInputs
+): EvalResult {
   let logOdds = def.intercept;
   const details: string[] = [`切片（log-odds）: ${def.intercept}`];
   for (const v of def.variables) {
     let rawVal: number;
     if (v.categoryMap) {
       const strVal = String(getVal(inputs, v.field) ?? "");
-      rawVal = v.categoryMap[strVal] ?? 0;
-      details.push(`${v.fieldLabel}: "${strVal}" → マッピング値 ${rawVal} × ${v.coefficient}`);
+      if (!Object.hasOwn(v.categoryMap, strVal))
+        throw new Error(`項目「${v.field}」に未定義のカテゴリがあります`);
+      rawVal = v.categoryMap[strVal];
+      details.push(
+        `${v.fieldLabel}: "${strVal}" → マッピング値 ${rawVal} × ${v.coefficient}`
+      );
     } else {
       rawVal = numVal(inputs, v.field);
-      details.push(`${v.fieldLabel}${v.unit ? `（${v.unit}）` : ""}: ${rawVal} × ${v.coefficient}`);
+      details.push(
+        `${v.fieldLabel}${v.unit ? `（${v.unit}）` : ""}: ${rawVal} × ${v.coefficient}`
+      );
     }
     logOdds += v.coefficient * rawVal;
   }
+  if (!Number.isFinite(logOdds))
+    throw new Error("確率計算の入力が有限の数値ではありません");
   const probability = 1 / (1 + Math.exp(-logOdds));
+  if (def.outputMode === "probability") {
+    details.push(`log-odds: ${logOdds.toFixed(4)}`);
+    details.push("確率のみの表示を選択しているため、二値判定は行いません。");
+    return {
+      isPositive: null,
+      prediction: `推定確率: ${(probability * 100).toFixed(1)}%`,
+      probability,
+      details,
+    };
+  }
   const probabilityThreshold = def.probabilityThreshold ?? 0.5;
   details.push(`log-odds: ${logOdds.toFixed(4)}`);
-  details.push(`予測確率: ${(probability * 100).toFixed(1)}%（判定閾値: ${(probabilityThreshold * 100).toFixed(0)}%）`);
+  details.push(
+    `予測確率: ${(probability * 100).toFixed(1)}%（判定閾値: ${(probabilityThreshold * 100).toFixed(0)}%）`
+  );
   const isPositive = probability >= probabilityThreshold;
   return {
     isPositive,
-    prediction: isPositive ? def.positiveMessage : def.negativeMessage,
+    prediction: isPositive ? def.positiveMessage! : def.negativeMessage!,
     probability,
     details,
   };
 }
 
 // ---- 6. 複合条件ルール ----
-function evalCompositeRule(def: CompositeRuleDefinition, inputs: PatientInputs): EvalResult {
+function evalCompositeRule(
+  def: CompositeRuleDefinition,
+  inputs: PatientInputs
+): EvalResult {
   const details: string[] = [];
   if (!def.root) {
-    return { isPositive: false, prediction: "評価不能（ルート条件未定義）", probability: null, details };
+    throw new Error("複合条件が未定義です");
   }
   const isPositive = evalLogicNode(def.root, inputs, details);
-  return { isPositive, prediction: isPositive ? def.positiveMessage : def.negativeMessage, probability: null, details };
+  return {
+    isPositive,
+    prediction: isPositive ? def.positiveMessage : def.negativeMessage,
+    probability: null,
+    details,
+  };
 }
 
-function evalLogicNode(node: LogicNode, inputs: PatientInputs, details: string[]): boolean {
+function evalLogicNode(
+  node: LogicNode,
+  inputs: PatientInputs,
+  details: string[]
+): boolean {
   if (node.logic === "CONDITION") {
     const v = getVal(inputs, node.field);
     const pass = compareOp(v, node.operator, node.value as number);
@@ -456,207 +676,220 @@ function evalLogicNode(node: LogicNode, inputs: PatientInputs, details: string[]
     return !result;
   }
   if (node.logic === "AND") {
-    const results = node.children.map((c) => evalLogicNode(c, inputs, details));
+    const results = node.children.map(c => evalLogicNode(c, inputs, details));
     const all = results.every(Boolean);
-    details.push(`AND（${results.map((r) => (r ? "✓" : "✗")).join(", ")}）→ ${all ? "✓" : "✗"}`);
+    details.push(
+      `AND（${results.map(r => (r ? "✓" : "✗")).join(", ")}）→ ${all ? "✓" : "✗"}`
+    );
     return all;
   }
   if (node.logic === "OR") {
-    const results = node.children.map((c) => evalLogicNode(c, inputs, details));
+    const results = node.children.map(c => evalLogicNode(c, inputs, details));
     const any = results.some(Boolean);
-    details.push(`OR（${results.map((r) => (r ? "✓" : "✗")).join(", ")}）→ ${any ? "✓" : "✗"}`);
+    details.push(
+      `OR（${results.map(r => (r ? "✓" : "✗")).join(", ")}）→ ${any ? "✓" : "✗"}`
+    );
     return any;
   }
   return false;
 }
 
 // ---- 7. カスタム数式 ----
-function evalCustomFormula(def: CustomFormulaRuleDefinition, inputs: PatientInputs): EvalResult {
-  const details: string[] = [`数式: ${def.formula}`];
-  const varDetails: string[] = [];
-
-  // 変数を数式に代入（安全な評価のため変数を展開）
-  let expr = def.formula;
-  for (const v of def.variables) {
-    const val = numVal(inputs, v.field);
-    varDetails.push(`${v.fieldLabel}${v.unit ? `（${v.unit}）` : ""} = ${val}`);
-    // 変数名を値に置換（単語境界を考慮）
-    expr = expr.replace(new RegExp(`\\b${v.field}\\b`, "g"), String(val));
+function evalCustomFormula(
+  def: CustomFormulaRuleDefinition,
+  inputs: PatientInputs
+): EvalResult {
+  const values: Record<string, number> = {};
+  const details = [`数式: ${def.formula}`];
+  for (const variable of def.variables) {
+    values[variable.field] = numVal(inputs, variable.field);
+    details.push(
+      `${variable.fieldLabel || variable.field} = ${values[variable.field]}`
+    );
   }
-  details.push(...varDetails);
-
-  let score = 0;
-  let evalError = false;
-  try {
-    // 安全な数式評価（四則演算・べき乗のみ許可）
-    score = safeEval(expr);
-    details.push(`計算結果: ${score.toFixed(4)}（閾値: ${def.threshold}）`);
-  } catch {
-    evalError = true;
-    details.push(`数式評価エラー: ${expr}`);
-  }
-
-  if (evalError) {
-    return { isPositive: false, prediction: "数式評価エラー", probability: null, details };
-  }
-
-  const isPositive = score >= def.threshold;
-  return { isPositive, prediction: isPositive ? def.positiveMessage : def.negativeMessage, probability: null, details };
-}
-
-/**
- * 安全な数式評価（四則演算・べき乗・括弧のみ許可）
- * evalを使わずに再帰的パーサーで実装
- */
-function safeEval(expr: string): number {
-  const tokens = tokenize(expr.replace(/\s+/g, ""));
-  let pos = 0;
-
-  function parseExpr(): number { return parseAddSub(); }
-
-  function parseAddSub(): number {
-    let left = parseMulDiv();
-    while (pos < tokens.length && (tokens[pos] === "+" || tokens[pos] === "-")) {
-      const op = tokens[pos++];
-      const right = parseMulDiv();
-      left = op === "+" ? left + right : left - right;
+  const score = evaluateFormula(def.formula, values);
+  if (def.outputMode === "continuous") {
+    if (def.modelType === "koyama_fim_total") {
+      const beta = (values.koyama_fim_total_b - values.koyama_fim_total_a) / Math.log(values.koyama_day_b / values.koyama_day_a);
+      details.push(`β = ${beta.toFixed(6)}（自然対数）`);
+      details.push(`予測対象: 発症後${values.koyama_target_day}日。FIM総得点（18〜126点）の参考予測。`);
+      if (values.koyama_fim_total_b === values.koyama_fim_total_a)
+        details.push("2時点で変化がないためβ＝0です。今後回復しないことを意味しません。");
+      details.push("原著本文未確認。総説p.775図2と原著公開抄録に基づく実装。個人の誤差幅は不明です。");
     }
-    return left;
+    return { isPositive: null, prediction: `予測値: ${score.toFixed(2)}${def.outputUnit ?? ""}`, probability: null, numericValue: score, details };
   }
-
-  function parseMulDiv(): number {
-    let left = parsePow();
-    while (pos < tokens.length && (tokens[pos] === "*" || tokens[pos] === "/")) {
-      const op = tokens[pos++];
-      const right = parsePow();
-      left = op === "*" ? left * right : left / right;
-    }
-    return left;
-  }
-
-  function parsePow(): number {
-    let base = parseUnary();
-    if (pos < tokens.length && tokens[pos] === "^") {
-      pos++;
-      const exp = parsePow();
-      base = Math.pow(base, exp);
-    }
-    return base;
-  }
-
-  function parseUnary(): number {
-    if (tokens[pos] === "-") { pos++; return -parsePrimary(); }
-    if (tokens[pos] === "+") { pos++; return parsePrimary(); }
-    return parsePrimary();
-  }
-
-  function parsePrimary(): number {
-    if (tokens[pos] === "(") {
-      pos++;
-      const val = parseExpr();
-      if (tokens[pos] !== ")") throw new Error("括弧が閉じていません");
-      pos++;
-      return val;
-    }
-    const tok = tokens[pos++];
-    const n = parseFloat(tok ?? "");
-    if (isNaN(n)) throw new Error(`不正なトークン: ${tok}`);
-    return n;
-  }
-
-  return parseExpr();
-}
-
-function tokenize(expr: string): string[] {
-  const tokens: string[] = [];
-  let i = 0;
-  while (i < expr.length) {
-    if ("+-*/^()".includes(expr[i]!)) {
-      tokens.push(expr[i]!);
-      i++;
-    } else if (/[\d.]/.test(expr[i]!)) {
-      let num = "";
-      while (i < expr.length && /[\d.]/.test(expr[i]!)) num += expr[i++];
-      tokens.push(num);
-    } else {
-      i++;
-    }
-  }
-  return tokens;
+  details.push(`計算結果: ${score.toFixed(4)}（閾値: ${def.threshold}）`);
+  const isPositive = score >= def.threshold!;
+  return {
+    isPositive,
+    prediction: isPositive ? def.positiveMessage! : def.negativeMessage!,
+    probability: null,
+    numericValue: score,
+    details,
+  };
 }
 
 // ============================================================
 // メイン評価関数
 // ============================================================
 
-export function evaluateRule(rule: LiteratureRule, inputs: PatientInputs): RuleEvaluationResult {
-  const def = rule.ruleDefinition as RuleDefinition;
-  const conditions = (rule.applyConditions ?? []) as ApplyCondition[];
-  const literatureSummary = buildLiteratureSummary(rule, def);
-
-  // 適用条件チェック
-  const { ok, reason } = checkApplyConditions(conditions, inputs);
-  if (!ok) {
-    return makeInapplicable(rule, literatureSummary, reason);
-  }
-
-  // 必要フィールドチェック
-  const requiredFields = extractRequiredFields(def);
-  const missingFields = requiredFields.filter(
-    (f) => inputs[f] === undefined || inputs[f] === null || inputs[f] === ""
-    // NOTE: false は有効な入力（boolean型フィールド）として扱う
-  ).filter((f) => inputs[f] !== false);
-  if (missingFields.length > 0) {
+export function evaluateRule(
+  rule: LiteratureRule,
+  inputs: PatientInputs
+): RuleEvaluationResult {
+  let literatureSummary: LiteratureSummary = {
+    overview: null,
+    targetPopulation: null,
+    predictors: [],
+    clinicalNote: null,
+  };
+  try {
+    const validation = patientInputsSchema.safeParse(inputs);
+    if (!validation.success)
+      throw new Error(
+        `入力値を確認してください: ${validation.error.issues.map(issue => issue.path.join(".")).join(", ")}`
+      );
+    const def = rule.ruleDefinition;
+    const metadata = def as RuleDefinition & { modelType?: string };
+    const exclusionReason = getRuleExclusionReason(def);
+    if (exclusionReason) {
+      return makeInapplicable(
+        rule,
+        literatureSummary,
+        exclusionReason,
+        "unsupported"
+      );
+    }
+    if (
+      metadata?.type === "nomogram" &&
+      metadata.modelType &&
+      metadata.modelType !== "logistic"
+    ) {
+      return makeInapplicable(
+        rule,
+        literatureSummary,
+        "未対応のモデルです。Coxモデルの時点別確率を算出するための情報・計算処理が未整備です。",
+        "unsupported"
+      );
+    }
+    const definitionError = validateRuleDefinition(def);
+    if (definitionError || def.type !== rule.ruleType) {
+      return makeInapplicable(
+        rule,
+        literatureSummary,
+        definitionError ?? "ルール種別と定義が一致しません",
+        "invalid_definition"
+      );
+    }
+    const conditionParse = applyConditionSchema
+      .array()
+      .safeParse(rule.applyConditions ?? []);
+    if (!conditionParse.success)
+      return makeInapplicable(
+        rule,
+        literatureSummary,
+        "適用条件の定義が不正です",
+        "invalid_definition"
+      );
+    literatureSummary = buildLiteratureSummary(rule, def);
+    const conditions = conditionParse.data as ApplyCondition[];
+    // A known exclusion takes precedence over an unrelated missing condition.
+    const available = conditions.filter(
+      c =>
+        inputs[c.field] !== undefined &&
+        inputs[c.field] !== null &&
+        inputs[c.field] !== ""
+    );
+    const { ok, reason } = checkApplyConditions(available, inputs);
+    if (!ok)
+      return makeInapplicable(rule, literatureSummary, reason, "outside");
+    const missingConditions = conditions
+      .filter(c => !available.includes(c))
+      .map(c => c.field);
+    if (missingConditions.length)
+      throw new MissingInputError(Array.from(new Set(missingConditions)));
+    // Decision trees only need inputs along the path actually taken.
+    if (def.type !== "decision_tree") {
+      const missing = extractRequiredFields(def).filter(
+        f => inputs[f] === undefined || inputs[f] === null || inputs[f] === ""
+      );
+      if (missing.length)
+        throw new MissingInputError(Array.from(new Set(missing)));
+    }
+    if (def.type === "custom_formula" && def.modelType === "koyama_fim_total") {
+      const reason = koyamaInputReason(inputs);
+      if (reason) return makeInapplicable(rule, literatureSummary, reason, "outside");
+    }
+    let result: EvalResult;
+    switch (def.type) {
+      case "cutoff":
+        result = evalCutoff(def, inputs);
+        break;
+      case "decision_tree":
+        result = evalDecisionTree(def, inputs);
+        break;
+      case "regression":
+        result = evalRegression(def, inputs);
+        break;
+      case "scoring_system":
+        result = evalScoringSystem(def, inputs);
+        break;
+      case "logistic_regression":
+      case "nomogram":
+        result = evalLogisticModel(def, inputs);
+        break;
+      case "composite_rule":
+        result = evalCompositeRule(def, inputs);
+        break;
+      case "custom_formula":
+        result = evalCustomFormula(def, inputs);
+        break;
+    }
+    if (def.type === "custom_formula" && def.modelType === "koyama_fim_total" &&
+        result.numericValue !== undefined && (result.numericValue < 18 || result.numericValue > 126))
+      return makeInapplicable(rule, literatureSummary,
+        `数式上の計算値は${result.numericValue.toFixed(2)}点で、FIM総得点の範囲（18〜126点）外です。上限・下限への置換はせず、通常の予測値表示を停止しました。`, "outside");
+    if (result.probability !== null && !Number.isFinite(result.probability))
+      throw new Error("確率を算出できません");
+    return {
+      ...makeInapplicable(rule, literatureSummary, null, "evaluated"),
+      timeline: def.type === "custom_formula" && def.modelType === "koyama_fim_total"
+        ? koyamaResultTimeline(inputs) : readTimeline(def),
+      isApplicable: true,
+      isPositive: result.isPositive,
+      prediction: result.prediction,
+      probability: result.probability,
+      numericValue: result.numericValue ?? null,
+      details: result.details,
+      matchExplanation: buildMatchExplanation(result),
+    };
+  } catch (error) {
     return makeInapplicable(
       rule,
       literatureSummary,
-      `必要な入力項目が未入力です: ${missingFields.join(", ")}`
+      error instanceof Error ? error.message : "ルールを評価できません",
+      error instanceof MissingInputError
+        ? "missing_input"
+        : "calculation_error",
+      error instanceof MissingInputError ? error.fields : []
     );
   }
-
-  // ルール評価
-  let evalResult: EvalResult;
-  switch (def.type) {
-    case "cutoff":         evalResult = evalCutoff(def, inputs); break;
-    case "decision_tree":  evalResult = evalDecisionTree(def, inputs); break;
-    case "regression":     evalResult = evalRegression(def, inputs); break;
-    case "scoring_system": evalResult = evalScoringSystem(def, inputs); break;
-    case "nomogram":       evalResult = evalNomogram(def, inputs); break;
-    case "composite_rule": evalResult = evalCompositeRule(def, inputs); break;
-    case "custom_formula": evalResult = evalCustomFormula(def, inputs); break;
-    default:
-      evalResult = { isPositive: false, prediction: "未対応のルールタイプ", probability: null, details: [] };
-  }
-
-  return {
-    ruleId: rule.id,
-    ruleName: rule.name,
-    ruleType: rule.ruleType,
-    source: rule.source,
-    sourceUrl: rule.sourceUrl ?? null,
-    evidenceLevel: rule.evidenceLevel,
-    literatureSummary,
-    matchExplanation: buildMatchExplanation(evalResult),
-    consensusEligible: rule.consensusEligible,
-    isApplicable: true,
-    unavailableReason: null,
-    isPositive: evalResult.isPositive,
-    prediction: evalResult.prediction,
-    probability: evalResult.probability,
-    details: evalResult.details,
-    accuracy: rule.accuracy ?? null,
-    sensitivity: rule.sensitivity ?? null,
-    specificity: rule.specificity ?? null,
-    auc: rule.auc ?? null,
-  };
 }
 
 function makeInapplicable(
   rule: LiteratureRule,
   literatureSummary: LiteratureSummary,
-  reason: string | null
+  reason: string | null,
+  status: EvaluationStatus,
+  missingFields: string[] = []
 ): RuleEvaluationResult {
   return {
+    status,
+    missingFields,
+    numericValue: null,
+    ...readContinuousOutput(rule.ruleDefinition),
+    timeline: readTimeline(rule.ruleDefinition),
     ruleId: rule.id,
     ruleName: rule.name,
     ruleType: rule.ruleType,
@@ -679,13 +912,16 @@ function makeInapplicable(
   };
 }
 
-export function calculateConsensus(results: RuleEvaluationResult[]): ConsensusAnalysis {
-  const eligible = results.filter((r) => r.consensusEligible && r.isApplicable);
-  const positive = eligible.filter((r) => r.isPositive === true);
-  const negative = eligible.filter((r) => r.isPositive === false);
-  const score = eligible.length > 0 ? positive.length / eligible.length : 0;
-  let label: "positive" | "neutral" | "negative";
-  if (score >= 0.7) label = "positive";
+export function calculateConsensus(
+  results: RuleEvaluationResult[]
+): ConsensusAnalysis {
+  const eligible = results.filter(isConsensusResult);
+  const positive = eligible.filter(r => r.isPositive === true);
+  const negative = eligible.filter(r => r.isPositive === false);
+  const score = eligible.length > 0 ? positive.length / eligible.length : null;
+  let label: ConsensusAnalysis["label"];
+  if (score === null) label = "unavailable";
+  else if (score >= 0.7) label = "positive";
   else if (score >= 0.4) label = "neutral";
   else label = "negative";
   return {
@@ -694,7 +930,7 @@ export function calculateConsensus(results: RuleEvaluationResult[]): ConsensusAn
     positiveCount: positive.length,
     negativeCount: negative.length,
     totalEligible: eligible.length,
-    applicableCount: results.filter((r) => r.isApplicable).length,
+    applicableCount: results.filter(r => r.isApplicable).length,
   };
 }
 
@@ -704,26 +940,67 @@ export function generateSuggestions(
   results: RuleEvaluationResult[]
 ): SuggestionItem[] {
   const suggestions: SuggestionItem[] = [];
-  for (const result of results.filter((r) => !r.isApplicable)) {
-    const rule = rules.find((r) => r.id === result.ruleId);
-    if (!rule) continue;
-    const def = rule.ruleDefinition as RuleDefinition;
-    const requiredFields = extractRequiredFields(def);
-    const missingFields = requiredFields.filter(
-      (f) => inputs[f] === undefined || inputs[f] === null || inputs[f] === ""
-    );
-    const isTimeBased = result.unavailableReason?.includes("適用条件") ?? false;
-    if (missingFields.length > 0 && !isTimeBased) {
-      suggestions.push({ ruleId: rule.id, ruleName: rule.name, missingFields, outcome: rule.name, reason: "missing_input" });
-    } else if (isTimeBased) {
-      suggestions.push({ ruleId: rule.id, ruleName: rule.name, missingFields: [], outcome: rule.name, reason: "time_condition" });
+  for (const result of results) {
+    if (result.status === "missing_input") {
+      suggestions.push({
+        ruleId: result.ruleId,
+        ruleName: result.ruleName,
+        missingFields: result.missingFields,
+        outcome: result.ruleName,
+        reason: "missing_input",
+      });
+    } else if (result.status === "outside") {
+      suggestions.push({
+        ruleId: result.ruleId,
+        ruleName: result.ruleName,
+        missingFields: [],
+        outcome: result.ruleName,
+        reason: "time_condition",
+      });
     }
   }
   return suggestions;
 }
 
-export function runEngine(rules: LiteratureRule[], inputs: PatientInputs): EngineOutput {
-  const results = rules.filter((r) => r.isActive).map((rule) => evaluateRule(rule, inputs));
+export function runEngine(
+  rules: LiteratureRule[],
+  inputs: PatientInputs,
+  timeContext?: TimeQuery
+): EngineOutput {
+  const results = rules
+    .filter(r => r.isActive)
+    .map(rule => {
+      const result = evaluateRule(rule, inputs);
+      const isKoyama = rule.ruleDefinition.type === "custom_formula" && rule.ruleDefinition.modelType === "koyama_fim_total";
+      if (import.meta.env?.VITE_DEMO_MODE === "true" && !isKoyama) return result;
+      const timeMatch = isKoyama ? matchKoyamaTime() : matchTimeline(result.timeline ?? null, timeContext);
+      const compared = {
+        ...result,
+        timeMatch,
+        consensusEligible:
+          result.consensusEligible &&
+          ["matched", "within_range", "review"].includes(timeMatch.status),
+      };
+      if (
+        timeMatch.status === "mismatch" &&
+        ["evaluated", "missing_input", "outside"].includes(result.status)
+      ) {
+        return {
+          ...compared,
+          status: "outside" as const,
+          isApplicable: false,
+          isPositive: null,
+          numericValue: null,
+          prediction: null,
+          probability: null,
+          missingFields: [],
+          details: [],
+          unavailableReason: timeMatch.reason,
+          matchExplanation: [timeMatch.reason],
+        };
+      }
+      return compared;
+    });
   const consensus = calculateConsensus(results);
   const suggestions = generateSuggestions(rules, inputs, results);
   return { results, consensus, suggestions };

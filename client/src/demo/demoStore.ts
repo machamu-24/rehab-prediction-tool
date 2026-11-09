@@ -1,6 +1,7 @@
 import { extractRequiredFieldsFromDef, runEngine } from "@shared/ruleEngine";
 import type { ActualOutcome, PatientInputs } from "../../../drizzle/schema";
 import { DEMO_DATA_VERSION, DEMO_OUTCOMES, DEMO_RULES } from "./staticData.generated";
+import { migrateLouie2018Rules } from "./louie2018Migration";
 
 type DemoOutcome = {
   id: number;
@@ -123,6 +124,11 @@ function readState(): DemoState {
       const state = initialState();
       writeState(state);
       return state;
+    }
+    const rules = migrateLouie2018Rules(parsed.rules);
+    if (rules.some((rule, index) => rule !== parsed.rules[index])) {
+      parsed.rules = rules;
+      writeState(parsed);
     }
     return parsed;
   } catch {

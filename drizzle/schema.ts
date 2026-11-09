@@ -9,6 +9,7 @@ import {
   boolean,
   json,
 } from "drizzle-orm/mysql-core";
+import { RULE_TYPES } from "../shared/ruleTypes";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -54,6 +55,7 @@ export type InsertOutcome = typeof outcomes.$inferInsert;
  *   regression      - 重回帰式（線形スコア → 閾値判定）
  *   scoring_system  - スコアリングシステム（各変数に点数を割り当て合計点で判定）
  *   nomogram        - ノモグラム（ロジスティック回帰ベースの確率算出）
+ *   logistic_regression - ロジスティック回帰（確率のみ、または明示した閾値による判定）
  *   composite_rule  - 複合条件ルール（AND/OR/NOT の論理演算）
  *   custom_formula  - カスタム数式（任意の数式を記述）
  */
@@ -61,15 +63,7 @@ export const literatureRules = mysqlTable("literature_rules", {
   id: int("id").autoincrement().primaryKey(),
   outcomeId: int("outcomeId").notNull(),
   name: varchar("name", { length: 256 }).notNull(),
-  ruleType: mysqlEnum("ruleType", [
-    "cutoff",
-    "decision_tree",
-    "regression",
-    "scoring_system",
-    "nomogram",
-    "composite_rule",
-    "custom_formula",
-  ]).notNull(),
+  ruleType: mysqlEnum("ruleType", RULE_TYPES).notNull(),
   // 文献情報
   source: varchar("source", { length: 512 }).notNull(),
   sourceUrl: varchar("sourceUrl", { length: 1024 }),
@@ -111,6 +105,12 @@ export const predictions = mysqlTable("predictions", {
   patientInputs: json("patientInputs").$type<PatientInputs>().notNull(),
   outcomeId: int("outcomeId").notNull(),
   consensusScore: float("consensusScore"),
+  caseId: varchar("caseId", { length: 64 }),
+  assessedOn: varchar("assessedOn", { length: 10 }),
+  assessmentPhase: varchar("assessmentPhase", { length: 32 }),
+  timeContext: json("timeContext").$type<import("../shared/literatureTimeline").TimeQuery>(),
+  engineVersion: varchar("engineVersion", { length: 64 }),
+  outcomeSnapshot: json("outcomeSnapshot").$type<Outcome>(),
   consensusLabel: varchar("consensusLabel", { length: 64 }),
   // 退院時実績
   actualOutcome: json("actualOutcome").$type<ActualOutcome>(),
@@ -137,6 +137,8 @@ export const predictionResults = mysqlTable("prediction_results", {
   prediction: text("prediction"),
   probability: float("probability"),
   details: json("details").$type<string[]>(),
+  ruleSnapshot: json("ruleSnapshot").$type<LiteratureRule>(),
+  resultSnapshot: json("resultSnapshot").$type<Record<string, unknown>>(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -163,6 +165,7 @@ export type RuleDefinition =
   | RegressionRuleDefinition
   | ScoringSystemRuleDefinition
   | NomogramRuleDefinition
+  | LogisticRegressionRuleDefinition
   | CompositeRuleDefinition
   | CustomFormulaRuleDefinition;
 
@@ -189,6 +192,7 @@ export type CutoffRuleDefinition = {
 // ---- 2. 決定木 ----
 export type DecisionTreeRuleDefinition = {
   type: "decision_tree";
+  outputMode?: "binary" | "descriptive" | "classified";
   nodes: DecisionTreeNode[];
 };
 
@@ -201,7 +205,8 @@ export type DecisionTreeNode = {
   trueNodeId?: string;
   falseNodeId?: string;
   isLeaf?: boolean;
-  isPositive?: boolean;
+  isPositive?: boolean | null;
+  probability?: number;
   message?: string;
 };
 
@@ -218,9 +223,11 @@ export type RegressionRuleDefinition = {
     unit?: string;
   }[];
   /** スコア ≥ threshold → positive */
-  threshold: number;
-  positiveMessage: string;
-  negativeMessage: string;
+  outputMode?: "continuous" | "binary";
+  outputUnit?: string;
+  threshold?: number;
+  positiveMessage?: string;
+  negativeMessage?: string;
 };
 
 // ---- 4. スコアリングシステム ----
@@ -260,6 +267,8 @@ export type ScoringItem = {
  */
 export type NomogramRuleDefinition = {
   type: "nomogram";
+  /** 閾値が報告されていない研究では確率のみを返す。 */
+  outputMode?: "binary" | "probability";
   intercept: number;
   variables: {
     field: string;
@@ -273,6 +282,16 @@ export type NomogramRuleDefinition = {
   probabilityThreshold?: number;
   positiveMessage: string;
   negativeMessage: string;
+};
+
+export type LogisticRegressionRuleDefinition = Omit<
+  NomogramRuleDefinition,
+  "type" | "outputMode" | "positiveMessage" | "negativeMessage"
+> & {
+  type: "logistic_regression";
+  outputMode: "probability" | "binary";
+  positiveMessage?: string;
+  negativeMessage?: string;
 };
 
 // ---- 6. 複合条件ルール ----
@@ -309,7 +328,7 @@ export type LogicNode =
  */
 export type CustomFormulaRuleDefinition = {
   type: "custom_formula";
-  /** 数式文字列（mathjs形式） */
+  /** 四則演算・べき乗・ln（自然対数） */
   formula: string;
   /** 数式の説明 */
   formulaDescription: string;
@@ -320,9 +339,12 @@ export type CustomFormulaRuleDefinition = {
     unit?: string;
   }[];
   /** スコア ≥ threshold → positive */
-  threshold: number;
-  positiveMessage: string;
-  negativeMessage: string;
+  outputMode?: "continuous" | "binary";
+  outputUnit?: string;
+  modelType?: "koyama_fim_total";
+  threshold?: number;
+  positiveMessage?: string;
+  negativeMessage?: string;
 };
 
 // ---- 患者入力データ ----
@@ -366,7 +388,7 @@ export type PatientInputs = {
 };
 
 // ---- 実績アウトカム ----
-export type ActualOutcome = {
+export type ActualOutcome = Partial<Pick<import("../shared/actualOutcome").RecordedOutcome, "scale" | "scaleName" | "measuredOn" | "daysSinceOnset">> & {
   value: string | number | boolean;
   label: string;
   fac_at_discharge?: number;

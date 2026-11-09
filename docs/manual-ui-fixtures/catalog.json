@@ -1,0 +1,148 @@
+[
+  {
+    "id": "L01",
+    "name": "基準カットオフ BBS ≥20",
+    "file": "L01-cutoff.json",
+    "eligible": true,
+    "conditions": []
+  },
+  {
+    "id": "L02",
+    "name": "陰性用 BBS ≥40",
+    "file": "L02-cutoff.json",
+    "eligible": true,
+    "conditions": []
+  },
+  {
+    "id": "L03",
+    "name": "参考専用 BBS ≥20",
+    "file": "L03-cutoff.json",
+    "eligible": false,
+    "conditions": []
+  },
+  {
+    "id": "L04",
+    "name": "対象120日",
+    "file": "L04-cutoff.json",
+    "eligible": true,
+    "conditions": []
+  },
+  {
+    "id": "L05",
+    "name": "概算評価30日",
+    "file": "L05-cutoff.json",
+    "eligible": true,
+    "conditions": []
+  },
+  {
+    "id": "L06",
+    "name": "同時点判別",
+    "file": "L06-cutoff.json",
+    "eligible": true,
+    "conditions": []
+  },
+  {
+    "id": "L07",
+    "name": "評価時点不明",
+    "file": "L07-cutoff.json",
+    "eligible": true,
+    "conditions": []
+  },
+  {
+    "id": "L08",
+    "name": "連続値回帰",
+    "file": "L08-regression.json",
+    "eligible": true,
+    "conditions": []
+  },
+  {
+    "id": "L09",
+    "name": "二値回帰 ≥19",
+    "file": "L09-regression.json",
+    "eligible": true,
+    "conditions": []
+  },
+  {
+    "id": "L10",
+    "name": "分岐のある二値決定木",
+    "file": "L10-decision_tree.json",
+    "eligible": true,
+    "conditions": []
+  },
+  {
+    "id": "L11",
+    "name": "記述型決定木",
+    "file": "L11-decision_tree.json",
+    "eligible": false,
+    "conditions": []
+  },
+  {
+    "id": "L12",
+    "name": "スコアリング3点",
+    "file": "L12-scoring_system.json",
+    "eligible": true,
+    "conditions": []
+  },
+  {
+    "id": "L13",
+    "name": "ロジスティックノモグラム",
+    "file": "L13-nomogram.json",
+    "eligible": true,
+    "conditions": []
+  },
+  {
+    "id": "L14",
+    "name": "AND・OR・NOT複合条件",
+    "file": "L14-composite_rule.json",
+    "eligible": true,
+    "conditions": []
+  },
+  {
+    "id": "L15",
+    "name": "カスタム数式",
+    "file": "L15-custom_formula.json",
+    "eligible": true,
+    "conditions": []
+  },
+  {
+    "id": "L16",
+    "name": "入院FIM運動50以上70未満の適用条件",
+    "file": "L16-cutoff.json",
+    "eligible": true,
+    "conditions": [
+      {
+        "field": "admission_fim_motor_total",
+        "operator": ">=",
+        "value": 50,
+        "label": "入院時FIM運動"
+      },
+      {
+        "field": "admission_fim_motor_total",
+        "operator": "<",
+        "value": 70,
+        "label": "入院時FIM運動"
+      }
+    ]
+  },
+  {
+    "id": "L17",
+    "name": "1ヶ月評価・3ヶ月予測",
+    "file": "L17-cutoff.json",
+    "eligible": true,
+    "conditions": []
+  },
+  {
+    "id": "L18",
+    "name": "平均30日評価",
+    "file": "L18-cutoff.json",
+    "eligible": true,
+    "conditions": []
+  },
+  {
+    "id": "L19",
+    "name": "中央値30日評価",
+    "file": "L19-cutoff.json",
+    "eligible": true,
+    "conditions": []
+  }
+]

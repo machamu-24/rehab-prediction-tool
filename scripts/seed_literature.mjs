@@ -1,3 +1,4 @@
+import { correctFimDefinition, FIM_SOURCE_URL } from "./lib/fim-correction.mjs";
 /**
  * 論文から抽出した文献ルールのシードデータ投入スクリプト
  * 対象論文:
@@ -554,14 +555,14 @@ const rules = [
     outcomeId: fimOutcomeId,
     name: "退院時FIM運動項目予測 重回帰式",
     ruleType: "regression",
-    source: "阿部専之ら（2026）J-STAGE早期公開",
+    source: "安部千秋ら（2026）理学療法学 53(2):111–119",
     authors: "阿部専之, 大野啓介, 高橋良祐, 荒芳幸, 阿部正幸, 白坂友英",
     journal: "理学療法学（J-STAGE早期公開）",
     year: 2026,
-    sourceUrl: "https://www.jstage.jst.go.jp/",
+    sourceUrl: FIM_SOURCE_URL,
     evidenceLevel: "Cohort Study",
     applyConditions: JSON.stringify([]),
-    ruleDefinition: JSON.stringify({
+    ruleDefinition: JSON.stringify(correctFimDefinition({
       type: "regression",
       description: "重回帰分析による退院時FIM運動項目合計スコアの予測式。入院時FIM運動・認知項目、年齢、発症から入院までの日数を用いる。",
       formula: "fim_motor_discharge = fim_motor_admission * 0.97 + fim_cognitive_admission * 0.56 - age * 0.26 - days_onset_to_admission * 0.16 + 47.2",
@@ -603,7 +604,7 @@ const rules = [
       positiveMessage: "退院時FIM運動項目の予測値が高い（自立度が高い）",
       negativeMessage: "退院時FIM運動項目の予測値が低い（要介助の可能性）",
       notes: "対象: 498名（2021年4月〜2023年3月）。5-fold交差検証: R²=0.699, RMSE=13.94。AIモデルとの比較でR²差0.016と小さく、臨床現場での実用性が高い。",
-    }),
+    })),
     accuracy: null,
     sensitivity: null,
     specificity: null,

@@ -1,7 +1,13 @@
+import { RULE_TYPE_OPTIONS, RULE_TYPE_LABELS, type RuleType } from "@shared/ruleTypes";
+import { TimelineEditor, TimelineSummary, emptyTimeline } from "@/components/LiteratureTimeline";
+import { parseOptionalTimeline, readTimeline, type LiteratureTimeline } from "@shared/literatureTimeline";
+import { PATIENT_FIELDS } from "@/lib/patientFields";
+import { validateRuleDefinition } from "@shared/ruleValidation";
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RuleExclusion } from "@/components/RuleExclusion";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -83,7 +89,7 @@ const FIELD_LABEL_MAP: Record<string, string> = {
   days_onset_to_admission: "発症〜入院日数",
   caregiver_available: "介護者あり",
   continence: "失禁なし",
-  cortical_lesion: "皮質病変なし",
+  cortical_lesion: "皮質病変",
   diabetes: "糖尿病",
   delta_bbs: "ΔBBS",
   delta_fim_motor: "ΔFIM運動",
@@ -91,18 +97,8 @@ const FIELD_LABEL_MAP: Record<string, string> = {
   nihss: "NIHSS",
 };
 function fieldLabel(field: string): string {
-  return FIELD_LABEL_MAP[field] ?? field;
+  return FIELD_LABEL_MAP[field] ?? patientFieldLabel(field);
 }
-
-const RULE_TYPE_OPTIONS = [
-  { value: "cutoff",         label: "カットオフ値",     desc: "単一または複合のカットオフ値による判定" },
-  { value: "decision_tree",  label: "決定木",           desc: "分岐条件による段階的な判定" },
-  { value: "regression",     label: "重回帰式",         desc: "複数変数の線形結合による数値予測" },
-  { value: "scoring_system", label: "スコアリング",     desc: "各変数に点数を割り当て合計で判定" },
-  { value: "nomogram",       label: "ノモグラム",       desc: "ロジスティック回帰ベースの確率算出" },
-  { value: "composite_rule", label: "複合条件",         desc: "AND/OR/NOT の論理演算による複合判定" },
-  { value: "custom_formula", label: "カスタム数式",     desc: "任意の数式を記述（変数名をそのまま使用可）" },
-] as const;
 
 const EVIDENCE_LEVEL_OPTIONS = [
   "Systematic Review",
@@ -120,16 +116,6 @@ const EVIDENCE_COLORS: Record<string, string> = {
   "Case-Control":         "bg-yellow-100 text-yellow-800 border-yellow-300",
   "Expert Classification":"bg-gray-100 text-gray-700 border-gray-300",
   "Other":                "bg-gray-100 text-gray-600 border-gray-200",
-};
-
-const RULE_TYPE_LABELS: Record<string, string> = {
-  cutoff:         "カットオフ値",
-  decision_tree:  "決定木",
-  regression:     "重回帰式",
-  scoring_system: "スコアリング",
-  nomogram:       "ノモグラム",
-  composite_rule: "複合条件",
-  custom_formula: "カスタム数式",
 };
 
 const EASY_RULE_TYPES = new Set(["cutoff", "regression"]);
@@ -181,6 +167,15 @@ const RULE_DEFINITION_TEMPLATES: Record<string, string> = {
     maxScore: 3,
     positiveMessage: "良好な転帰が期待できる",
     negativeMessage: "転帰不良のリスクあり",
+  }, null, 2),
+  logistic_regression: JSON.stringify({
+    type: "logistic_regression",
+    outputMode: "probability",
+    description: "切片と係数を文献の非標準化回帰係数に置き換えてください。オッズ比は代入しません。",
+    intercept: 0,
+    variables: [
+      { field: "admission_bbs_score", fieldLabel: "入院時BBS", coefficient: 0 },
+    ],
   }, null, 2),
   nomogram: JSON.stringify({
     type: "nomogram",
@@ -248,6 +243,7 @@ const APPLY_CONDITION_OPERATORS: { value: string; label: string }[] = [
 ];
 
 const PATIENT_FIELD_OPTIONS = [
+  ...PATIENT_FIELDS.flatMap(section => section.fields).filter(field => field.key.startsWith("admission_") || field.key.startsWith("koyama_") || ["prestroke_mrs", "months_since_onset", "spatial_neglect", "cognitive_impairment", "first_stroke", "prestroke_adl_independent", "supratentorial_stroke", "hemiparesis_present"].includes(field.key)).map(field => ({ value: field.key, label: field.label })),
   { value: "days_post_stroke",       label: "発症日数" },
   { value: "days_since_onset",       label: "発症後日数" },
   { value: "days_onset_to_admission", label: "発症から入院までの日数" },
@@ -280,7 +276,7 @@ const PATIENT_FIELD_OPTIONS = [
   { value: "care_level",             label: "要介護認定区分" },
   { value: "caregiver_available",    label: "介護者あり" },
   { value: "continence",             label: "失禁なし" },
-  { value: "cortical_lesion",        label: "皮質病変なし" },
+  { value: "cortical_lesion",        label: "皮質病変" },
   { value: "diabetes",               label: "糖尿病" },
   { value: "delta_bbs",              label: "ΔBBS" },
   { value: "delta_fim_motor",        label: "ΔFIM運動" },
@@ -288,6 +284,7 @@ const PATIENT_FIELD_OPTIONS = [
 ] as const;
 
 type RuleForm = {
+  timeline: LiteratureTimeline;
   outcomeId: string;
   name: string;
   ruleType: string;
@@ -323,6 +320,8 @@ type RegressionCoefficientForm = {
 };
 
 type RegressionBuilderForm = {
+  outputMode: "continuous" | "binary";
+  outputUnit: string;
   formula: string;
   intercept: string;
   threshold: string;
@@ -339,6 +338,7 @@ type RulePreview = {
 };
 
 const defaultForm: RuleForm = {
+  timeline: emptyTimeline(),
   outcomeId: "",
   name: "",
   ruleType: "cutoff",
@@ -367,6 +367,7 @@ const defaultCutoffBuilder: CutoffBuilderForm = {
 };
 
 const defaultRegressionBuilder: RegressionBuilderForm = {
+  outputMode: "binary", outputUnit: "点",
   formula: "予測スコア = 切片 + 各係数 × 評価値",
   intercept: "0",
   threshold: "0",
@@ -446,7 +447,7 @@ type LiteratureRule = {
 export default function RulesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [editTarget, setEditTarget] = useState<LiteratureRule | null>(null);
+  const [editTarget, setEditTarget] = useState<(LiteratureRule & {editToken?:string}) | null>(null);
   const [form, setForm] = useState<RuleForm>(defaultForm);
   const [cutoffBuilder, setCutoffBuilder] = useState<CutoffBuilderForm>(defaultCutoffBuilder);
   const [regressionBuilder, setRegressionBuilder] = useState<RegressionBuilderForm>(defaultRegressionBuilder);
@@ -524,6 +525,8 @@ export default function RulesPage() {
     } else if (def.type === "regression") {
       const rawCoefficients = Array.isArray(def.coefficients) ? def.coefficients as Array<Record<string, unknown>> : [];
       setRegressionBuilder({
+        outputMode: def.outputMode === "continuous" ? "continuous" : "binary",
+        outputUnit: String(def.outputUnit ?? "点"),
         formula: String(def.formula ?? defaultRegressionBuilder.formula),
         intercept: String(def.intercept ?? defaultRegressionBuilder.intercept),
         threshold: String(def.threshold ?? defaultRegressionBuilder.threshold),
@@ -546,6 +549,7 @@ export default function RulesPage() {
       setRegressionBuilder(defaultRegressionBuilder);
     }
     setForm({
+      timeline: readTimeline(r.ruleDefinition) ?? emptyTimeline(),
       outcomeId: r.outcomeId.toString(),
       name: r.name,
       ruleType: r.ruleType,
@@ -595,6 +599,8 @@ export default function RulesPage() {
   };
 
   const buildRuleDefinition = (): { definition: Record<string, unknown>; logicLines: string[] } => {
+    const rawOriginal = JSON.parse(form.ruleDefinition);
+    const original = rawOriginal?.type === form.ruleType ? rawOriginal as Record<string, unknown> : {};
     if (form.ruleType === "cutoff") {
       if (!cutoffBuilder.field) throw new Error("評価項目を選択してください");
       if (!cutoffBuilder.fieldLabel.trim()) throw new Error("評価項目の表示名を入力してください");
@@ -603,6 +609,7 @@ export default function RulesPage() {
       const threshold = parseRequiredNumber(cutoffBuilder.threshold, "カットオフ値");
       const unit = cutoffBuilder.unit.trim();
       const definition = {
+        ...original,
         type: "cutoff",
         field: cutoffBuilder.field,
         fieldLabel: cutoffBuilder.fieldLabel.trim(),
@@ -624,14 +631,17 @@ export default function RulesPage() {
 
     if (form.ruleType === "regression") {
       const intercept = parseRequiredNumber(regressionBuilder.intercept, "切片");
-      const threshold = parseRequiredNumber(regressionBuilder.threshold, "判定閾値");
-      if (!regressionBuilder.positiveMessage.trim()) throw new Error("閾値以上の場合のメッセージを入力してください");
-      if (!regressionBuilder.negativeMessage.trim()) throw new Error("閾値未満の場合のメッセージを入力してください");
+      const continuous = regressionBuilder.outputMode === "continuous";
+      const threshold = continuous ? undefined : parseRequiredNumber(regressionBuilder.threshold, "判定閾値");
+      if (!continuous && !regressionBuilder.positiveMessage.trim()) throw new Error("閾値以上の場合のメッセージを入力してください");
+      if (!continuous && !regressionBuilder.negativeMessage.trim()) throw new Error("閾値未満の場合のメッセージを入力してください");
 
       const coefficients = regressionBuilder.coefficients.map((coef, index) => {
         if (!coef.field) throw new Error(`係数${index + 1}の評価項目を選択してください`);
         if (!coef.fieldLabel.trim()) throw new Error(`係数${index + 1}の表示名を入力してください`);
+        const previous = Array.isArray(original.coefficients) ? original.coefficients.find((c: { field?: string }) => c.field === coef.field) : {};
         return {
+          ...previous,
           field: coef.field,
           fieldLabel: coef.fieldLabel.trim(),
           coefficient: parseRequiredNumber(coef.coefficient, `係数${index + 1}`),
@@ -645,21 +655,26 @@ export default function RulesPage() {
         ...coefficients.map((coef) => `${coef.coefficient >= 0 ? "+" : "-"} ${Math.abs(coef.coefficient)} * ${coef.fieldLabel}`),
       ].join(" ");
       const definition = {
+        ...original,
         type: "regression",
+        outputMode: regressionBuilder.outputMode,
+        outputUnit: regressionBuilder.outputUnit.trim(),
         formula,
         intercept,
         coefficients,
         threshold,
-        positiveMessage: regressionBuilder.positiveMessage.trim(),
-        negativeMessage: regressionBuilder.negativeMessage.trim(),
+        positiveMessage: continuous ? undefined : regressionBuilder.positiveMessage.trim(),
+        negativeMessage: continuous ? undefined : regressionBuilder.negativeMessage.trim(),
       };
       return {
         definition,
         logicLines: [
           formula,
-          `判定: 予測値 >= ${threshold} なら陽性`,
-          `閾値以上: ${definition.positiveMessage}`,
-          `閾値未満: ${definition.negativeMessage}`,
+          ...(continuous ? [`数値予測として表示（${definition.outputUnit}）。支持・困難の集計には含めません。`] : [
+            `判定: 予測値 >= ${threshold} なら陽性`,
+            `閾値以上: ${definition.positiveMessage}`,
+            `閾値未満: ${definition.negativeMessage}`,
+          ]),
         ],
       };
     }
@@ -686,6 +701,13 @@ export default function RulesPage() {
 
     try {
       const { definition, logicLines } = buildRuleDefinition();
+      if (import.meta.env.VITE_DEMO_MODE !== "true") {
+        const timeline = parseOptionalTimeline(form.timeline);
+        if (timeline) definition.timeline = timeline;
+        else delete definition.timeline;
+      }
+      const definitionError = validateRuleDefinition(definition);
+      if (definitionError) throw new Error(definitionError);
       const requiredFields = Array.from(new Set(extractPreviewFields(definition)));
       if (isEasyRuleType) {
         setForm((f) => ({ ...f, ruleDefinition: JSON.stringify(definition, null, 2) }));
@@ -712,7 +734,7 @@ export default function RulesPage() {
     const data = {
       outcomeId: Number(form.outcomeId),
       name: form.name,
-      ruleType: form.ruleType as "cutoff" | "decision_tree" | "regression" | "scoring_system" | "nomogram" | "composite_rule" | "custom_formula",
+      ruleType: form.ruleType as RuleType,
       source: form.source,
       sourceUrl: form.sourceUrl || undefined,
       evidenceLevel: form.evidenceLevel as "Systematic Review" | "RCT" | "Cohort Study" | "Case-Control" | "Expert Classification" | "Other",
@@ -720,7 +742,7 @@ export default function RulesPage() {
         field: c.field,
         label: c.label || (PATIENT_FIELD_OPTIONS.find((f) => f.value === c.field)?.label ?? c.field),
         operator: normalizeConditionOperator(c.operator),
-        value: isNaN(Number(c.value)) ? c.value : Number(c.value),
+        value: c.value === "true" ? true : c.value === "false" ? false : c.value.trim() !== "" && !isNaN(Number(c.value)) ? Number(c.value) : c.value,
       })),
       ruleDefinition: preview.definition,
       accuracy: form.accuracy ? Number(form.accuracy) : null,
@@ -733,7 +755,7 @@ export default function RulesPage() {
     };
 
     if (editTarget) {
-      updateMutation.mutate({ id: editTarget.id, data });
+      updateMutation.mutate({ id: editTarget.id, editToken: editTarget.editToken ?? "", data });
     } else {
       createMutation.mutate(data);
     }
@@ -808,6 +830,8 @@ export default function RulesPage() {
                       {!r.consensusEligible && <Badge variant="outline" className="text-xs text-amber-700 border-amber-300">コンセンサス除外</Badge>}
                     </div>
                     <p className="text-sm text-muted-foreground mt-1 truncate">{r.source}</p>
+                    <TimelineSummary definition={r.ruleDefinition} />
+                    <RuleExclusion definition={r.ruleDefinition} />
                     {/* 必要な評価項目表示 */}
                     {("requiredFields" in r) && (r as { requiredFields?: string[] }).requiredFields && (r as { requiredFields?: string[] }).requiredFields!.length > 0 && (
                       <div className="mt-2">
@@ -824,8 +848,8 @@ export default function RulesPage() {
                           {("applyConditionFields" in r) && (r as { applyConditionFields?: Array<{field: string; label: string}> }).applyConditionFields && (r as { applyConditionFields?: Array<{field: string; label: string}> }).applyConditionFields!.length > 0 && (
                             <>
                               <span className="inline-flex items-center px-1.5 py-0.5 text-xs text-muted-foreground">適用条件:</span>
-                              {(r as { applyConditionFields?: Array<{field: string; label: string}> }).applyConditionFields!.map((c) => (
-                                <span key={c.field} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                              {(r as { applyConditionFields?: Array<{field: string; label: string}> }).applyConditionFields!.map((c, index) => (
+                                <span key={`${c.field}-${index}`} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
                                   {c.label}
                                 </span>
                               ))}
@@ -835,9 +859,9 @@ export default function RulesPage() {
                       </div>
                     )}
                     <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-muted-foreground">
-                      {r.accuracy    && <span>正確度: <strong>{Number(r.accuracy).toFixed(1)}%</strong></span>}
-                      {r.sensitivity && <span>感度: <strong>{Number(r.sensitivity).toFixed(1)}%</strong></span>}
-                      {r.specificity && <span>特異度: <strong>{Number(r.specificity).toFixed(1)}%</strong></span>}
+                      {r.accuracy != null && <span>正確度: <strong>{(r.accuracy <= 1 ? r.accuracy * 100 : r.accuracy).toFixed(1)}%</strong></span>}
+                      {r.sensitivity != null && <span>感度: <strong>{(r.sensitivity <= 1 ? r.sensitivity * 100 : r.sensitivity).toFixed(1)}%</strong></span>}
+                      {r.specificity != null && <span>特異度: <strong>{(r.specificity <= 1 ? r.specificity * 100 : r.specificity).toFixed(1)}%</strong></span>}
                       {r.auc         && <span>AUC: <strong>{r.auc.toFixed(2)}</strong></span>}
                       {r.sourceUrl && (
                         <a href={r.sourceUrl} target="_blank" rel="noopener noreferrer"
@@ -848,7 +872,7 @@ export default function RulesPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(r as LiteratureRule & { ruleDefinition?: unknown; applyConditions?: unknown })}>
+                    <Button aria-label={`${r.name}を編集`} variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(r as LiteratureRule & { ruleDefinition?: unknown; applyConditions?: unknown })}>
                       <Edit2 className="h-3.5 w-3.5" />
                     </Button>
                     <Button
@@ -877,8 +901,9 @@ export default function RulesPage() {
           </DialogHeader>
 
           <Tabs defaultValue="basic" className="mt-2">
-            <TabsList className="grid h-auto w-full grid-cols-2 sm:grid-cols-5">
+            <TabsList className="grid h-auto w-full grid-cols-2 sm:grid-cols-6">
               <TabsTrigger value="basic" className="text-xs sm:text-sm">基本情報</TabsTrigger>
+              {import.meta.env.VITE_DEMO_MODE !== "true" && <TabsTrigger value="timeline" className="text-xs sm:text-sm">時間軸</TabsTrigger>}
               <TabsTrigger value="definition" className="text-xs sm:text-sm">判定ルール</TabsTrigger>
               <TabsTrigger value="conditions" className="text-xs sm:text-sm">適用条件</TabsTrigger>
               <TabsTrigger value="accuracy" className="text-xs sm:text-sm">精度指標</TabsTrigger>
@@ -980,6 +1005,8 @@ export default function RulesPage() {
                 </div>
               </div>
             </TabsContent>
+
+            {import.meta.env.VITE_DEMO_MODE !== "true" && <TabsContent value="timeline" className="mt-4"><TimelineEditor value={form.timeline} onChange={timeline=>setForm(f=>({...f,timeline}))}/></TabsContent>}
 
             {/* 適用条件タブ */}
             <TabsContent value="conditions" className="space-y-3 mt-4">
@@ -1170,6 +1197,15 @@ export default function RulesPage() {
 
               {form.ruleType === "regression" && (
                 <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5"><Label>結果の表示方法</Label>
+                      <Select value={regressionBuilder.outputMode} onValueChange={v => setRegressionBuilder(b => ({ ...b, outputMode: v as "continuous" | "binary" }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="continuous">数値予測</SelectItem><SelectItem value="binary">閾値による判定</SelectItem></SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5"><Label>出力単位</Label><Input value={regressionBuilder.outputUnit} onChange={e => setRegressionBuilder(b => ({ ...b, outputUnit: e.target.value }))} /></div>
+                  </div>
                   <div className="space-y-1.5">
                     <Label>式の説明</Label>
                     <Textarea
@@ -1194,6 +1230,7 @@ export default function RulesPage() {
                       <Input
                         type="number"
                         step="any"
+                        disabled={regressionBuilder.outputMode === "continuous"}
                         value={regressionBuilder.threshold}
                         onChange={(e) => setRegressionBuilder((b) => ({ ...b, threshold: e.target.value }))}
                       />
@@ -1292,6 +1329,7 @@ export default function RulesPage() {
                     <Label>閾値以上の場合の表示</Label>
                     <Textarea
                       className="min-h-20"
+                      disabled={regressionBuilder.outputMode === "continuous"}
                       value={regressionBuilder.positiveMessage}
                       onChange={(e) => setRegressionBuilder((b) => ({ ...b, positiveMessage: e.target.value }))}
                     />
@@ -1300,6 +1338,7 @@ export default function RulesPage() {
                     <Label>閾値未満の場合の表示</Label>
                     <Textarea
                       className="min-h-20"
+                      disabled={regressionBuilder.outputMode === "continuous"}
                       value={regressionBuilder.negativeMessage}
                       onChange={(e) => setRegressionBuilder((b) => ({ ...b, negativeMessage: e.target.value }))}
                     />
@@ -1419,6 +1458,7 @@ export default function RulesPage() {
                             <Badge variant="secondary">{form.outcomeId ? outcomeName(Number(form.outcomeId)) : "アウトカム未選択"}</Badge>
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">{form.source}</p>
+                          <TimelineSummary definition={preview.definition}/>
                         </div>
                         <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
                       </div>
@@ -1489,7 +1529,7 @@ export default function RulesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>文献ルールを削除しますか？</AlertDialogTitle>
             <AlertDialogDescription>
-              この操作は取り消せません。このルールを使用した予測履歴の結果も参照できなくなる場合があります。
+              この操作は取り消せません。文献一覧と今後の照合対象から削除します。過去の照合履歴と、履歴に保存された文献情報・判定結果は残ります。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -11,6 +11,7 @@
  *   ※ walking_period_regression.pdf はフォントエラーのため読み取り不可（スキップ）
  */
 import mysql from "mysql2/promise";
+import { correctLouieRule, LOUIE_SOURCE_URL } from "./lib/louie-2018.mjs";
 import * as dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -62,73 +63,14 @@ console.log(`✅ アウトカム「地域歩行」ID: ${communityOutcomeId}`);
 // ---- 文献ルール登録 ----
 const rules = [
 
-  // ===== 論文1a: BBS入院時スコア → 地域歩行予測（Louie & Eng 2018） =====
-  {
-    outcomeId: communityOutcomeId,
-    name: "BBS入院時スコアによる地域歩行予測（≥29点）",
-    ruleType: "cutoff",
-    source: "Louie DR, Eng JJ (2018) J Rehabil Med 50: 37-44",
-    authors: "Louie DR, Eng JJ",
-    journal: "Journal of Rehabilitation Medicine",
-    year: 2018,
-    sourceUrl: "https://doi.org/10.2340/16501977-2280",
-    evidenceLevel: "Cohort Study",
-    applyConditions: JSON.stringify([
-      { field: "days_post_stroke", operator: "<=", value: 28, label: "発症4週以内（入院リハビリ開始時）" }
-    ]),
-    ruleDefinition: JSON.stringify({
-      type: "cutoff",
-      field: "bbs_score",
-      fieldLabel: "Berg Balance Scale（BBS）入院時スコア",
-      operator: ">=",
-      threshold: 29,
-      unit: "点",
-      positiveMessage: "退院時に地域歩行速度（≥0.8 m/s）を達成できる可能性が高い（BBS≥29点）",
-      negativeMessage: "退院時に地域歩行速度の達成は困難な可能性（BBS<29点）",
-      notes: "対象: 入院リハビリ開始時（発症中央値19日）の脳卒中患者123名（カナダ）。4週間の入院リハビリ後の歩行能力を予測。多変量モデルでは脳卒中タイプ（脳出血 OR=0.19）と発症日数（OR=0.93）も有意な予測因子。",
-    }),
-    accuracy: null,
-    sensitivity: 0.86,
-    specificity: 0.84,
-    auc: 0.88,
-    consensusEligible: 1,
-    isActive: 1,
-    sortOrder: 20,
-  },
-
-  // ===== 論文1b: BBS入院時スコア → 非補助歩行予測（Louie & Eng 2018） =====
-  {
-    outcomeId: walkOutcomeId,
-    name: "BBS入院時スコアによる非補助歩行予測（非歩行者サブグループ, ≥12点）",
-    ruleType: "cutoff",
-    source: "Louie DR, Eng JJ (2018) J Rehabil Med 50: 37-44",
-    authors: "Louie DR, Eng JJ",
-    journal: "Journal of Rehabilitation Medicine",
-    year: 2018,
-    sourceUrl: "https://doi.org/10.2340/16501977-2280",
-    evidenceLevel: "Cohort Study",
-    applyConditions: JSON.stringify([
-      { field: "days_post_stroke", operator: "<=", value: 28, label: "発症4週以内（入院リハビリ開始時）" }
-    ]),
-    ruleDefinition: JSON.stringify({
-      type: "cutoff",
-      field: "bbs_score",
-      fieldLabel: "Berg Balance Scale（BBS）入院時スコア",
-      operator: ">=",
-      threshold: 12,
-      unit: "点",
-      positiveMessage: "4週間の入院リハビリ後に補助なし歩行を達成できる可能性がある（BBS≥12点）",
-      negativeMessage: "4週間後も補助なし歩行の達成は困難な可能性（BBS<12点）",
-      notes: "対象: 入院時に非歩行者（5MWTを補助なしで完遂できない）のサブグループ n=84。BBS単独が有意な予測因子（OR=1.11, 95%CI: 1.05-1.17）。AUC=0.73（95%CI: 0.62-0.84）。",
-    }),
-    accuracy: null,
-    sensitivity: 0.74,
-    specificity: 0.68,
-    auc: 0.73,
-    consensusEligible: 1,
-    isActive: 1,
-    sortOrder: 21,
-  },
+  // 原著に照合した定義を通常版・デモと共有する。
+  ...[60001, 60002].map(id => {
+    const { id: ignoredId, ...rule } = correctLouieRule({
+      id, outcomeId: id === 60001 ? communityOutcomeId : walkOutcomeId,
+      ruleDefinition: {}, isActive: 1, sortOrder: id === 60001 ? 20 : 21,
+    });
+    return { ...rule, applyConditions: JSON.stringify(rule.applyConditions), ruleDefinition: JSON.stringify(rule.ruleDefinition) };
+  }),
 
   // ===== 論文2a: TUGによる地域歩行予測（Lee et al. 2016） =====
   {
@@ -603,8 +545,10 @@ for (const rule of rules) {
 
   // 既存チェック（同名ルールがあればスキップ）
   const [existing] = await connection.execute(
-    "SELECT id FROM literature_rules WHERE name = ? LIMIT 1",
-    [name]
+    sourceUrl === LOUIE_SOURCE_URL
+      ? "SELECT id FROM literature_rules WHERE name = ? OR (sourceUrl = ? AND outcomeId = ?) LIMIT 1"
+      : "SELECT id FROM literature_rules WHERE name = ? LIMIT 1",
+    sourceUrl === LOUIE_SOURCE_URL ? [name, sourceUrl, outcomeId] : [name]
   );
   if (existing.length > 0) {
     console.log(`⏭️  スキップ（既存）: 「${name}」`);

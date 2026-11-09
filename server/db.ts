@@ -1,4 +1,8 @@
-import { eq, desc, and } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
+import { getEditToken } from "./ruleReview";
+import { persistPrediction, savedResultCount } from "./predictionRepository";
+import { removeLiteratureRule } from "./literatureRepository";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -34,7 +38,10 @@ export async function getDb() {
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) throw new Error("User openId is required for upsert");
   const db = await getDb();
-  if (!db) { console.warn("[Database] Cannot upsert user: database not available"); return; }
+  if (!db) {
+    console.warn("[Database] Cannot upsert user: database not available");
+    return;
+  }
   try {
     const values: InsertUser = { openId: user.openId };
     const updateSet: Record<string, unknown> = {};
@@ -48,19 +55,38 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet[field] = normalized;
     };
     textFields.forEach(assignNullable);
-    if (user.lastSignedIn !== undefined) { values.lastSignedIn = user.lastSignedIn; updateSet.lastSignedIn = user.lastSignedIn; }
-    if (user.role !== undefined) { values.role = user.role; updateSet.role = user.role; }
-    else if (user.openId === ENV.ownerOpenId) { values.role = "admin"; updateSet.role = "admin"; }
+    if (user.lastSignedIn !== undefined) {
+      values.lastSignedIn = user.lastSignedIn;
+      updateSet.lastSignedIn = user.lastSignedIn;
+    }
+    if (user.role !== undefined) {
+      values.role = user.role;
+      updateSet.role = user.role;
+    } else if (user.openId === ENV.ownerOpenId) {
+      values.role = "admin";
+      updateSet.role = "admin";
+    }
     if (!values.lastSignedIn) values.lastSignedIn = new Date();
-    if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
-    await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
-  } catch (error) { console.error("[Database] Failed to upsert user:", error); throw error; }
+    if (Object.keys(updateSet).length === 0)
+      updateSet.lastSignedIn = new Date();
+    await db
+      .insert(users)
+      .values(values)
+      .onDuplicateKeyUpdate({ set: updateSet });
+  } catch (error) {
+    console.error("[Database] Failed to upsert user:", error);
+    throw error;
+  }
 }
 
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, openId))
+    .limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
@@ -68,14 +94,24 @@ export async function getUserByOpenId(openId: string) {
 
 export async function getAllOutcomes() {
   const db = await getDb();
-  if (!db) return [];
-  return db.select().from(outcomes).orderBy(outcomes.sortOrder, outcomes.createdAt);
+  if (!db)
+    throw new Error(
+      "データベースに接続できません。接続設定を確認してください。"
+    );
+  return db
+    .select()
+    .from(outcomes)
+    .orderBy(outcomes.sortOrder, outcomes.createdAt);
 }
 
 export async function getOutcomeById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(outcomes).where(eq(outcomes.id, id)).limit(1);
+  const result = await db
+    .select()
+    .from(outcomes)
+    .where(eq(outcomes.id, id))
+    .limit(1);
   return result[0];
 }
 
@@ -95,28 +131,58 @@ export async function updateOutcome(id: number, data: Partial<InsertOutcome>) {
 export async function deleteOutcome(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  return db.delete(outcomes).where(eq(outcomes.id, id));
+  return db.transaction(async tx => {
+    const [outcome] = await tx
+      .select()
+      .from(outcomes)
+      .where(eq(outcomes.id, id))
+      .for("update");
+    if (!outcome) throw new Error("アウトカムが見つかりません");
+    if (outcome.isDefault)
+      throw new Error("デフォルトのアウトカムは削除できません");
+    const rules = await tx
+      .select({ id: literatureRules.id })
+      .from(literatureRules)
+      .where(eq(literatureRules.outcomeId, id))
+      .limit(1);
+    const history = await tx
+      .select({ id: predictions.id })
+      .from(predictions)
+      .where(eq(predictions.outcomeId, id))
+      .limit(1);
+    if (rules.length || history.length)
+      throw new Error("文献ルールまたは履歴が紐づいているため削除できません");
+    return tx.delete(outcomes).where(eq(outcomes.id, id));
+  });
 }
 
 // ---- Literature Rules ----
 
-export async function getAllRules(outcomeId?: number) {
+export async function getAllRules(outcomeId?: number, activeOnly = false) {
   const db = await getDb();
-  if (!db) return [];
-  if (outcomeId !== undefined) {
-    return db
-      .select()
-      .from(literatureRules)
-      .where(and(eq(literatureRules.outcomeId, outcomeId), eq(literatureRules.isActive, true)))
-      .orderBy(literatureRules.sortOrder, literatureRules.createdAt);
-  }
-  return db.select().from(literatureRules).orderBy(literatureRules.sortOrder, literatureRules.createdAt);
+  if (!db)
+    throw new Error(
+      "データベースに接続できません。接続設定を確認してください。"
+    );
+  const conditions = [];
+  if (outcomeId !== undefined)
+    conditions.push(eq(literatureRules.outcomeId, outcomeId));
+  if (activeOnly) conditions.push(eq(literatureRules.isActive, true));
+  return db
+    .select()
+    .from(literatureRules)
+    .where(and(...conditions))
+    .orderBy(literatureRules.sortOrder, literatureRules.createdAt);
 }
 
 export async function getRuleById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(literatureRules).where(eq(literatureRules.id, id)).limit(1);
+  const result = await db
+    .select()
+    .from(literatureRules)
+    .where(eq(literatureRules.id, id))
+    .limit(1);
   return result[0];
 }
 
@@ -126,36 +192,121 @@ export async function createRule(data: InsertLiteratureRule) {
   return db.insert(literatureRules).values(data);
 }
 
-export async function updateRule(id: number, data: Partial<InsertLiteratureRule>) {
+export async function updateRule(
+  id: number,
+  data: Partial<InsertLiteratureRule>,
+  expectedEditToken?: string
+) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  return db.update(literatureRules).set(data).where(eq(literatureRules.id, id));
+  return db.transaction(async tx => {
+    const [current] = await tx
+      .select()
+      .from(literatureRules)
+      .where(eq(literatureRules.id, id))
+      .for("update");
+    if (!current)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "文献ルールが見つかりません",
+      });
+    if (expectedEditToken && getEditToken(current) !== expectedEditToken)
+      throw new TRPCError({
+        code: "CONFLICT",
+        message:
+          "編集中にルールが更新されました。入力内容を控え、一覧を再読み込みして開き直してください",
+      });
+    return tx
+      .update(literatureRules)
+      .set(data)
+      .where(eq(literatureRules.id, id));
+  });
 }
 
 export async function deleteRule(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  return db.delete(literatureRules).where(eq(literatureRules.id, id));
+  return removeLiteratureRule(db, id);
 }
 
 // ---- Predictions ----
 
-export async function createPrediction(data: InsertPrediction) {
+export async function savePredictionWithResults(
+  data: InsertPrediction,
+  results: Array<Omit<InsertPredictionResult, "predictionId">>
+) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  return db.insert(predictions).values(data);
+  return persistPrediction(db, data, results);
 }
 
-export async function getAllPredictions(limit = 100) {
+export async function getAllPredictions(
+  limit = 100,
+  filters: {
+    offset?: number;
+    outcomeId?: number;
+    search?: string;
+    caseId?: string;
+  } = {}
+) {
   const db = await getDb();
-  if (!db) return [];
-  return db.select().from(predictions).orderBy(desc(predictions.createdAt)).limit(limit);
+  if (!db)
+    throw new Error(
+      "データベースに接続できません。接続設定を確認してください。"
+    );
+  const search = filters.search?.trim();
+  const searchId =
+    search && /^\d+$/.test(search) && Number.isSafeInteger(Number(search))
+      ? Number(search)
+      : -1;
+  const conditions = [
+    filters.caseId ? eq(predictions.caseId, filters.caseId) : undefined,
+    filters.outcomeId
+      ? eq(predictions.outcomeId, filters.outcomeId)
+      : undefined,
+    search
+      ? sql`(${predictions.id} = ${searchId} or locate(${search}, coalesce(${predictions.notes}, '')) > 0)`
+      : undefined,
+  ];
+  return db
+    .select({
+      id: predictions.id,
+      outcomeId: predictions.outcomeId,
+      patientInputs: predictions.patientInputs,
+      consensusScore: predictions.consensusScore,
+      consensusLabel: predictions.consensusLabel,
+      actualOutcome: predictions.actualOutcome,
+      outcomeRecordedAt: predictions.outcomeRecordedAt,
+      notes: predictions.notes,
+      createdAt: predictions.createdAt,
+      updatedAt: predictions.updatedAt,
+      caseId: predictions.caseId,
+      assessedOn: predictions.assessedOn,
+      assessmentPhase: predictions.assessmentPhase,
+      timeContext: predictions.timeContext,
+      engineVersion: predictions.engineVersion,
+      outcomeSnapshot: predictions.outcomeSnapshot,
+      resultCount: savedResultCount,
+    })
+    .from(predictions)
+    .where(and(...conditions))
+    .orderBy(
+      ...(filters.caseId
+        ? [desc(predictions.assessedOn), desc(predictions.id)]
+        : [desc(predictions.createdAt), desc(predictions.id)])
+    )
+    .limit(limit)
+    .offset(filters.offset ?? 0);
 }
 
 export async function getPredictionById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(predictions).where(eq(predictions.id, id)).limit(1);
+  const result = await db
+    .select()
+    .from(predictions)
+    .where(eq(predictions.id, id))
+    .limit(1);
   return result[0];
 }
 
@@ -166,24 +317,36 @@ export async function updatePredictionOutcome(
 ) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  return db
-    .update(predictions)
-    .set({ actualOutcome, outcomeRecordedAt: new Date(), notes: notes ?? null })
-    .where(eq(predictions.id, id));
+  return db.transaction(async tx => {
+    const [current] = await tx
+      .select()
+      .from(predictions)
+      .where(eq(predictions.id, id))
+      .for("update");
+    if (!current)
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "照合履歴が見つかりません",
+      });
+    return tx
+      .update(predictions)
+      .set({
+        actualOutcome: { ...current.actualOutcome, ...actualOutcome },
+        outcomeRecordedAt: new Date(),
+        ...(notes !== undefined ? { notes } : {}),
+      })
+      .where(eq(predictions.id, id));
+  });
 }
 
 // ---- Prediction Results ----
 
-export async function createPredictionResults(data: InsertPredictionResult[]) {
-  const db = await getDb();
-  if (!db) throw new Error("DB not available");
-  if (data.length === 0) return;
-  return db.insert(predictionResults).values(data);
-}
-
 export async function getPredictionResultsByPredictionId(predictionId: number) {
   const db = await getDb();
-  if (!db) return [];
+  if (!db)
+    throw new Error(
+      "データベースに接続できません。接続設定を確認してください。"
+    );
   return db
     .select()
     .from(predictionResults)

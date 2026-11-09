@@ -20,7 +20,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { getLoginUrl, isLoginConfigured } from "@/const";
-import { useIsMobile } from "@/hooks/useMobile";
 import {
   Activity,
   BookOpen,
@@ -41,6 +40,7 @@ const menuItems = [
   { icon: History,        label: "照合履歴",     path: "/history" },
   { icon: BookOpen,       label: "文献ルール管理", path: "/rules" },
   { icon: ClipboardList,  label: "アウトカム管理", path: "/outcomes" },
+  ...(import.meta.env.VITE_DEMO_MODE === "true" ? [] : [{ icon: Settings, label: "接続・バックアップ", path: "/local" }]),
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -90,12 +90,11 @@ function DashboardLayoutContent({
 }: DashboardLayoutContentProps) {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
-  const { state, toggleSidebar } = useSidebar();
+  const { state, toggleSidebar, isMobile, setOpenMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const activeMenuItem = menuItems.find((item) => item.path === location);
-  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
@@ -164,7 +163,7 @@ function DashboardLayoutContent({
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton
                       isActive={isActive}
-                      onClick={() => setLocation(item.path)}
+                      onClick={() => { setLocation(item.path); if (isMobile) setOpenMobile(false); }}
                       tooltip={item.label}
                       className="h-10 transition-all font-normal"
                     >

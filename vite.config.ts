@@ -150,7 +150,11 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+const isDemoBuild = process.env.VITE_DEMO_MODE === "true";
+const plugins = [react(), tailwindcss(), ...(isDemoBuild ? [jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()] : [{
+  name: "local-fonts",
+  transformIndexHtml(html: string) { return html.replace(/<link\b[^>]*https:\/\/fonts\.[^>]*>/g, ""); },
+}])];
 const base = process.env.VITE_BASE_PATH ?? "/";
 
 export default defineConfig({

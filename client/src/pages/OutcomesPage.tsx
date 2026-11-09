@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +30,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ClipboardList, Edit2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { readContinuousOutput } from "@shared/resultStatus";
+import { FIM_MOTOR_OUTCOME_NAME } from "@shared/outcomeSelection";
 
 type Outcome = {
   id: number;
@@ -62,6 +70,21 @@ export default function OutcomesPage() {
 
   const utils = trpc.useUtils();
   const { data: outcomes, isLoading } = trpc.outcomes.list.useQuery();
+  const { data: rules } = trpc.rules.list.useQuery({});
+
+  const isScoreOutcome = (name: string, id?: number) => {
+    if (name === FIM_MOTOR_OUTCOME_NAME) return true;
+    const outcomeRules = rules?.filter(rule => rule.outcomeId === id);
+    if (outcomeRules?.length) {
+      return outcomeRules.every(rule =>
+        readContinuousOutput(rule.ruleDefinition)
+      );
+    }
+    // These existing score outcomes also need the numeric UI before rules load
+    // and when registering an outcome before its first literature rule.
+    return ["FIM総得点", "FIM運動項目"].includes(name.trim());
+  };
+  const scoreForm = isScoreOutcome(form.name, editTarget?.id);
 
   const createMutation = trpc.outcomes.create.useMutation({
     onSuccess: () => {
@@ -69,7 +92,7 @@ export default function OutcomesPage() {
       toast.success("アウトカムを登録しました");
       setDialogOpen(false);
     },
-    onError: (e) => toast.error(`エラー: ${e.message}`),
+    onError: e => toast.error(`エラー: ${e.message}`),
   });
 
   const updateMutation = trpc.outcomes.update.useMutation({
@@ -78,7 +101,7 @@ export default function OutcomesPage() {
       toast.success("アウトカムを更新しました");
       setDialogOpen(false);
     },
-    onError: (e) => toast.error(`エラー: ${e.message}`),
+    onError: e => toast.error(`エラー: ${e.message}`),
   });
 
   const deleteMutation = trpc.outcomes.delete.useMutation({
@@ -87,7 +110,7 @@ export default function OutcomesPage() {
       toast.success("アウトカムを削除しました");
       setDeleteId(null);
     },
-    onError: (e) => toast.error(`エラー: ${e.message}`),
+    onError: e => toast.error(`エラー: ${e.message}`),
   });
 
   const openCreate = () => {
@@ -140,7 +163,9 @@ export default function OutcomesPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold">アウトカム管理</h1>
-            <p className="text-sm text-muted-foreground">予測対象のアウトカムを登録・管理します</p>
+            <p className="text-sm text-muted-foreground">
+              予測対象のアウトカムを登録・管理します
+            </p>
           </div>
         </div>
         <Button onClick={openCreate} className="gap-2">
@@ -151,7 +176,9 @@ export default function OutcomesPage() {
 
       {/* アウトカム一覧 */}
       {isLoading ? (
-        <div className="text-center py-12 text-muted-foreground">読み込み中...</div>
+        <div className="text-center py-12 text-muted-foreground">
+          読み込み中...
+        </div>
       ) : outcomes?.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-12 text-center text-muted-foreground">
@@ -164,7 +191,7 @@ export default function OutcomesPage() {
         </Card>
       ) : (
         <div className="grid gap-3">
-          {outcomes?.map((o) => (
+          {outcomes?.map(o => (
             <Card key={o.id} className="transition-all hover:shadow-sm">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-4">
@@ -172,22 +199,49 @@ export default function OutcomesPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold">{o.name}</h3>
                       {o.unit && (
-                        <Badge variant="secondary" className="text-xs">{o.unit}</Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          {o.unit}
+                        </Badge>
                       )}
                       {o.isDefault && (
-                        <Badge className="text-xs bg-primary/10 text-primary border-primary/30">デフォルト</Badge>
+                        <Badge className="text-xs bg-primary/10 text-primary border-primary/30">
+                          デフォルト
+                        </Badge>
                       )}
                     </div>
                     {o.description && (
-                      <p className="text-sm text-muted-foreground mt-1">{o.description}</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {o.description}
+                      </p>
                     )}
-                    <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                      <span>陽性ラベル: <strong className="text-emerald-700">{o.positiveLabel}</strong></span>
-                      <span>陰性ラベル: <strong className="text-red-600">{o.negativeLabel}</strong></span>
-                    </div>
+                    {isScoreOutcome(o.name, o.id) ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {o.name === FIM_MOTOR_OUTCOME_NAME ? "点数予測と、文献ごとの到達分類を確認するアウトカムです。" : "点数を予測するアウトカムです。"}
+                      </p>
+                    ) : (
+                      <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                        <span>
+                          陽性ラベル:{" "}
+                          <strong className="text-emerald-700">
+                            {o.positiveLabel}
+                          </strong>
+                        </span>
+                        <span>
+                          陰性ラベル:{" "}
+                          <strong className="text-red-600">
+                            {o.negativeLabel}
+                          </strong>
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(o)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => openEdit(o)}
+                    >
                       <Edit2 className="h-3.5 w-3.5" />
                     </Button>
                     <Button
@@ -211,15 +265,19 @@ export default function OutcomesPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editTarget ? "アウトカムを編集" : "アウトカムを新規登録"}</DialogTitle>
+            <DialogTitle>
+              {editTarget ? "アウトカムを編集" : "アウトカムを新規登録"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label>アウトカム名 <span className="text-destructive">*</span></Label>
+              <Label>
+                アウトカム名 <span className="text-destructive">*</span>
+              </Label>
               <Input
                 placeholder="例: 歩行自立、FIM合計、入院日数"
                 value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
               />
             </div>
             <div className="space-y-1.5">
@@ -227,7 +285,9 @@ export default function OutcomesPage() {
               <Input
                 placeholder="例: 退院時のFAC（機能的歩行分類）≥4を歩行自立と定義"
                 value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                onChange={e =>
+                  setForm(f => ({ ...f, description: e.target.value }))
+                }
               />
             </div>
             <div className="space-y-1.5">
@@ -235,38 +295,52 @@ export default function OutcomesPage() {
               <Input
                 placeholder="例: FAC、点、日"
                 value={form.unit}
-                onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
+                onChange={e => setForm(f => ({ ...f, unit: e.target.value }))}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>陽性ラベル</Label>
-                <Input
-                  placeholder="例: 歩行自立"
-                  value={form.positiveLabel}
-                  onChange={(e) => setForm((f) => ({ ...f, positiveLabel: e.target.value }))}
-                />
+            {scoreForm ? (
+              <p className="text-sm text-muted-foreground">
+                点数を予測するため、陽性・陰性ラベルの設定は不要です。
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>陽性ラベル</Label>
+                  <Input
+                    placeholder="例: 歩行自立"
+                    value={form.positiveLabel}
+                    onChange={e =>
+                      setForm(f => ({ ...f, positiveLabel: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>陰性ラベル</Label>
+                  <Input
+                    placeholder="例: 歩行非自立"
+                    value={form.negativeLabel}
+                    onChange={e =>
+                      setForm(f => ({ ...f, negativeLabel: e.target.value }))
+                    }
+                  />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>陰性ラベル</Label>
-                <Input
-                  placeholder="例: 歩行非自立"
-                  value={form.negativeLabel}
-                  onChange={(e) => setForm((f) => ({ ...f, negativeLabel: e.target.value }))}
-                />
-              </div>
-            </div>
+            )}
             <div className="space-y-1.5">
               <Label>表示順</Label>
               <Input
                 type="number"
                 value={form.sortOrder}
-                onChange={(e) => setForm((f) => ({ ...f, sortOrder: Number(e.target.value) }))}
+                onChange={e =>
+                  setForm(f => ({ ...f, sortOrder: Number(e.target.value) }))
+                }
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>キャンセル</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              キャンセル
+            </Button>
             <Button
               onClick={handleSubmit}
               disabled={createMutation.isPending || updateMutation.isPending}
@@ -278,7 +352,12 @@ export default function OutcomesPage() {
       </Dialog>
 
       {/* 削除確認ダイアログ */}
-      <AlertDialog open={deleteId !== null} onOpenChange={(o) => { if (!o) setDeleteId(null); }}>
+      <AlertDialog
+        open={deleteId !== null}
+        onOpenChange={o => {
+          if (!o) setDeleteId(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>アウトカムを削除しますか？</AlertDialogTitle>
@@ -290,7 +369,9 @@ export default function OutcomesPage() {
             <AlertDialogCancel>キャンセル</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => { if (deleteId) deleteMutation.mutate({ id: deleteId }); }}
+              onClick={() => {
+                if (deleteId) deleteMutation.mutate({ id: deleteId });
+              }}
             >
               削除する
             </AlertDialogAction>

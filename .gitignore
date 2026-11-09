@@ -102,6 +102,8 @@ tmp/
 temp/
 
 # Database
+backups/
+rehab_db_backup_*.sql
 *.db
 *.sqlite
 *.sqlite3

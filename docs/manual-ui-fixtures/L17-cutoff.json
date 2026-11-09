@@ -1,0 +1,29 @@
+{
+  "type": "cutoff",
+  "field": "bbs_score",
+  "fieldLabel": "BBS",
+  "operator": ">=",
+  "threshold": 20,
+  "unit": "点",
+  "positiveMessage": "QA：支持",
+  "negativeMessage": "QA：困難示唆",
+  "timeline": {
+    "version": 1,
+    "anchor": "stroke_onset",
+    "kind": "future",
+    "evaluation": {
+      "value": 1,
+      "unit": "month",
+      "precision": "exact",
+      "originalText": "架空仕様：発症後1ヶ月",
+      "basis": "手動UI試験のための合成仕様。臨床利用不可。"
+    },
+    "target": {
+      "value": 3,
+      "unit": "month",
+      "precision": "exact",
+      "originalText": "架空仕様：発症後3ヶ月",
+      "basis": "手動UI試験のための合成仕様。臨床利用不可。"
+    }
+  }
+}

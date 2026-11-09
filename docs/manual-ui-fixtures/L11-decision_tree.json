@@ -1,0 +1,54 @@
+{
+  "type": "decision_tree",
+  "outputMode": "descriptive",
+  "nodes": [
+    {
+      "id": "root",
+      "field": "sitting_balance_30s",
+      "fieldLabel": "座位30秒",
+      "operator": "boolean",
+      "trueNodeId": "yes",
+      "falseNodeId": "bbs"
+    },
+    {
+      "id": "bbs",
+      "field": "bbs_score",
+      "fieldLabel": "BBS",
+      "operator": ">=",
+      "threshold": 20,
+      "trueNodeId": "yes",
+      "falseNodeId": "no"
+    },
+    {
+      "id": "yes",
+      "isLeaf": true,
+      "message": "QA：研究群内80%",
+      "probability": 0.8
+    },
+    {
+      "id": "no",
+      "isLeaf": true,
+      "message": "QA：研究群内20%",
+      "probability": 0.2
+    }
+  ],
+  "timeline": {
+    "version": 1,
+    "anchor": "stroke_onset",
+    "kind": "future",
+    "evaluation": {
+      "value": 30,
+      "unit": "day",
+      "precision": "exact",
+      "originalText": "架空仕様：発症後30日",
+      "basis": "手動UI試験のための合成仕様。臨床利用不可。"
+    },
+    "target": {
+      "value": 90,
+      "unit": "day",
+      "precision": "exact",
+      "originalText": "架空仕様：発症後90日",
+      "basis": "手動UI試験のための合成仕様。臨床利用不可。"
+    }
+  }
+}

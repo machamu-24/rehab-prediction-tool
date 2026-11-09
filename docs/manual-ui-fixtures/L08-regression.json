@@ -1,0 +1,38 @@
+{
+  "type": "regression",
+  "formula": "10 + 0.5 × BBS - 0.1 × 年齢",
+  "intercept": 10,
+  "coefficients": [
+    {
+      "field": "bbs_score",
+      "fieldLabel": "BBS",
+      "coefficient": 0.5
+    },
+    {
+      "field": "age",
+      "fieldLabel": "年齢",
+      "coefficient": -0.1
+    }
+  ],
+  "outputMode": "continuous",
+  "outputUnit": "点",
+  "timeline": {
+    "version": 1,
+    "anchor": "stroke_onset",
+    "kind": "future",
+    "evaluation": {
+      "value": 30,
+      "unit": "day",
+      "precision": "exact",
+      "originalText": "架空仕様：発症後30日",
+      "basis": "手動UI試験のための合成仕様。臨床利用不可。"
+    },
+    "target": {
+      "value": 90,
+      "unit": "day",
+      "precision": "exact",
+      "originalText": "架空仕様：発症後90日",
+      "basis": "手動UI試験のための合成仕様。臨床利用不可。"
+    }
+  }
+}

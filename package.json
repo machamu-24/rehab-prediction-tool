@@ -14,7 +14,11 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate"
+    "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "local:start": "node scripts/local-launch.mjs",
+    "local:backup": "node scripts/local-db.mjs backup",
+    "local:restore": "node scripts/local-db.mjs restore",
+    "local:migrate": "node scripts/local-db.mjs migrate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",

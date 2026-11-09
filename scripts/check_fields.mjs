@@ -12,6 +12,7 @@ const extractFields = (def) => {
       return def.coefficients.map(c => c.field);
     case 'scoring_system':
       return def.items.map(i => i.field);
+    case 'logistic_regression':
     case 'nomogram':
       return def.variables.map(v => v.field);
     case 'decision_tree':

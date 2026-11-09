@@ -14,6 +14,8 @@ const cutoffRule = {
   evidenceLevel: "Cohort Study",
   applyConditions: [],
   ruleDefinition: {
+    evidenceReview: {status:"checked",reason:"合成テスト専用"},
+    timeline: {version:1,anchor:"stroke_onset",kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact",originalText:"合成30日",basis:"テスト専用"}},
     type: "cutoff",
     field: "bbs_score",
     fieldLabel: "BBS",
@@ -44,6 +46,8 @@ const decisionTreeRule = {
   evidenceLevel: "Systematic Review",
   applyConditions: [{ field: "days_since_onset", operator: "<=", value: 3 }],
   ruleDefinition: {
+    evidenceReview: {status:"checked",reason:"合成テスト専用"},
+    timeline: {version:1,anchor:"stroke_onset",kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact",originalText:"合成30日",basis:"テスト専用"}},
     type: "decision_tree",
     nodes: [
       { id: "root", field: "sitting_balance_30s", fieldLabel: "座位保持30秒", operator: "boolean", trueNodeId: "check_mi", falseNodeId: "leaf_neg" },
@@ -73,6 +77,8 @@ const scoringRule = {
   evidenceLevel: "Cohort Study",
   applyConditions: [],
   ruleDefinition: {
+    evidenceReview: {status:"checked",reason:"合成テスト専用"},
+    timeline: {version:1,anchor:"stroke_onset",kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact",originalText:"合成30日",basis:"テスト専用"}},
     type: "scoring_system",
     items: [
       { field: "nihss", fieldLabel: "NIHSS", unit: "点", bands: [
@@ -107,6 +113,8 @@ const compositeRule = {
   evidenceLevel: "Cohort Study",
   applyConditions: [],
   ruleDefinition: {
+    evidenceReview: {status:"checked",reason:"合成テスト専用"},
+    timeline: {version:1,anchor:"stroke_onset",kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact",originalText:"合成30日",basis:"テスト専用"}},
     type: "composite_rule",
     root: {
       logic: "OR",
@@ -145,6 +153,8 @@ const kimuraUsnCognitiveRule = {
   evidenceLevel: "Cohort Study",
   applyConditions: [],
   ruleDefinition: {
+    evidenceReview: {status:"checked",reason:"合成テスト専用"},
+    timeline: {version:1,anchor:"stroke_onset",kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact",originalText:"合成30日",basis:"テスト専用"}},
     type: "composite_rule",
     root: {
       logic: "NOT",
@@ -177,7 +187,7 @@ const kimuraUsnCognitiveRule = {
 describe("ruleEngine - カットオフルール", () => {
   it("BBS >= 14 のとき陽性を返す", () => {
     const inputs: PatientInputs = { bbs_score: 20 };
-    const { results } = runEngine([cutoffRule], inputs);
+    const { results } = runEngine([cutoffRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     expect(results[0].isApplicable).toBe(true);
     expect(results[0].isPositive).toBe(true);
     expect(results[0].literatureSummary.predictors).toContain("BBS");
@@ -186,14 +196,14 @@ describe("ruleEngine - カットオフルール", () => {
 
   it("BBS < 14 のとき陰性を返す", () => {
     const inputs: PatientInputs = { bbs_score: 10 };
-    const { results } = runEngine([cutoffRule], inputs);
+    const { results } = runEngine([cutoffRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     expect(results[0].isApplicable).toBe(true);
     expect(results[0].isPositive).toBe(false);
   });
 
   it("BBS が未入力のとき適用不可を返す", () => {
     const inputs: PatientInputs = {};
-    const { results } = runEngine([cutoffRule], inputs);
+    const { results } = runEngine([cutoffRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     expect(results[0].isApplicable).toBe(false);
     expect(results[0].unavailableReason).toBeTruthy();
   });
@@ -206,7 +216,7 @@ describe("ruleEngine - 決定木ルール（時期依存）", () => {
       sitting_balance_30s: true,
       motricity_index_lower: 30,
     };
-    const { results } = runEngine([decisionTreeRule], inputs);
+    const { results } = runEngine([decisionTreeRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     expect(results[0].isApplicable).toBe(true);
     expect(results[0].isPositive).toBe(true);
   });
@@ -217,7 +227,7 @@ describe("ruleEngine - 決定木ルール（時期依存）", () => {
       sitting_balance_30s: false,
       motricity_index_lower: 0, // 座位保持なしの場合、MI下肢は評価されないが入力自体は必要
     };
-    const { results } = runEngine([decisionTreeRule], inputs);
+    const { results } = runEngine([decisionTreeRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     expect(results[0].isApplicable).toBe(true);
     expect(results[0].isPositive).toBe(false);
   });
@@ -228,7 +238,7 @@ describe("ruleEngine - 決定木ルール（時期依存）", () => {
       sitting_balance_30s: true,
       motricity_index_lower: 50,
     };
-    const { results } = runEngine([decisionTreeRule], inputs);
+    const { results } = runEngine([decisionTreeRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     expect(results[0].isApplicable).toBe(false);
   });
 });
@@ -236,14 +246,14 @@ describe("ruleEngine - 決定木ルール（時期依存）", () => {
 describe("ruleEngine - スコアリングシステム", () => {
   it("NIHSS <= 5 のとき陽性（スコア3）を返す", () => {
     const inputs: PatientInputs = { nihss: 3 };
-    const { results } = runEngine([scoringRule], inputs);
+    const { results } = runEngine([scoringRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     expect(results[0].isApplicable).toBe(true);
     expect(results[0].isPositive).toBe(true);
   });
 
   it("NIHSS > 15 のとき陰性（スコア0）を返す", () => {
     const inputs: PatientInputs = { nihss: 20 };
-    const { results } = runEngine([scoringRule], inputs);
+    const { results } = runEngine([scoringRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     expect(results[0].isApplicable).toBe(true);
     expect(results[0].isPositive).toBe(false);
   });
@@ -252,42 +262,42 @@ describe("ruleEngine - スコアリングシステム", () => {
 describe("ruleEngine - 複合条件ルール", () => {
   it("男性・NIHSS=5 のとき陽性を返す（7.5以下）", () => {
     const inputs: PatientInputs = { sex: "男性", nihss: 5 };
-    const { results } = runEngine([compositeRule], inputs);
+    const { results } = runEngine([compositeRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     expect(results[0].isApplicable).toBe(true);
     expect(results[0].isPositive).toBe(true);
   });
 
   it("男性・NIHSS=10 のとき陰性を返す（7.5超過）", () => {
     const inputs: PatientInputs = { sex: "男性", nihss: 10 };
-    const { results } = runEngine([compositeRule], inputs);
+    const { results } = runEngine([compositeRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     expect(results[0].isApplicable).toBe(true);
     expect(results[0].isPositive).toBe(false);
   });
 
   it("女性・NIHSS=5 のとき陽性を返す（5 <= 5.5）", () => {
     const inputs: PatientInputs = { sex: "女性", nihss: 5 };
-    const { results } = runEngine([compositeRule], inputs);
+    const { results } = runEngine([compositeRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     expect(results[0].isApplicable).toBe(true);
     expect(results[0].isPositive).toBe(true);
   });
 
   it("女性・NIHSS=6 のとき陰性を返す（6 > 5.5）", () => {
     const inputs: PatientInputs = { sex: "女性", nihss: 6 };
-    const { results } = runEngine([compositeRule], inputs);
+    const { results } = runEngine([compositeRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     expect(results[0].isApplicable).toBe(true);
     expect(results[0].isPositive).toBe(false);
   });
 
   it("女性・NIHSS=4 のとき陽性を返す（5.5以下）", () => {
     const inputs: PatientInputs = { sex: "女性", nihss: 4 };
-    const { results } = runEngine([compositeRule], inputs);
+    const { results } = runEngine([compositeRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     expect(results[0].isApplicable).toBe(true);
     expect(results[0].isPositive).toBe(true);
   });
 
   it("Kimuraルール: USN単独では歩行自立側として扱う", () => {
     const inputs: PatientInputs = { spatial_neglect: true, mmse_score: 28 };
-    const { results, consensus } = runEngine([kimuraUsnCognitiveRule], inputs);
+    const { results, consensus } = runEngine([kimuraUsnCognitiveRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     expect(results[0].isApplicable).toBe(true);
     expect(results[0].isPositive).toBe(true);
     expect(results[0].prediction).toContain("歩行自立");
@@ -296,7 +306,7 @@ describe("ruleEngine - 複合条件ルール", () => {
 
   it("Kimuraルール: USNとMMSE<24の合併では歩行自立困難側として扱う", () => {
     const inputs: PatientInputs = { spatial_neglect: true, mmse_score: 23 };
-    const { results, consensus } = runEngine([kimuraUsnCognitiveRule], inputs);
+    const { results, consensus } = runEngine([kimuraUsnCognitiveRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     expect(results[0].isApplicable).toBe(true);
     expect(results[0].isPositive).toBe(false);
     expect(results[0].prediction).toContain("歩行自立困難");
@@ -311,7 +321,7 @@ describe("ruleEngine - コンセンサス分析", () => {
       nihss: 3,
       sex: "男性",
     };
-    const { consensus } = runEngine([cutoffRule, scoringRule, compositeRule], inputs);
+    const { consensus } = runEngine([cutoffRule, scoringRule, compositeRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     expect(consensus.label).toBe("positive");
     expect(consensus.score).toBeGreaterThan(0.5);
   });
@@ -322,15 +332,16 @@ describe("ruleEngine - コンセンサス分析", () => {
       nihss: 20,
       sex: "男性",
     };
-    const { consensus } = runEngine([cutoffRule, scoringRule, compositeRule], inputs);
+    const { consensus } = runEngine([cutoffRule, scoringRule, compositeRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     expect(consensus.label).toBe("negative");
     expect(consensus.score).toBeLessThan(0.5);
   });
 
-  it("ルールが空のとき consensus.score が 0 になる", () => {
+  it("ルールが空のとき判定不能になる", () => {
     const inputs: PatientInputs = { bbs_score: 20 };
-    const { consensus } = runEngine([], inputs);
-    expect(consensus.score).toBe(0);
+    const { consensus } = runEngine([], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
+    expect(consensus.score).toBeNull();
+    expect(consensus.label).toBe("unavailable");
     expect(consensus.totalEligible).toBe(0);
   });
 });
@@ -338,7 +349,7 @@ describe("ruleEngine - コンセンサス分析", () => {
 describe("ruleEngine - 追加評価提案", () => {
   it("BBS未入力のとき bbs_score の追加評価を提案する", () => {
     const inputs: PatientInputs = {};
-    const { suggestions } = runEngine([cutoffRule], inputs);
+    const { suggestions } = runEngine([cutoffRule], inputs, {kind:"concurrent",evaluation:{value:30,unit:"day",precision:"exact"}});
     const missingInputSuggestions = suggestions.filter((s) => s.reason === "missing_input");
     expect(missingInputSuggestions.length).toBeGreaterThan(0);
     expect(missingInputSuggestions[0].missingFields).toContain("bbs_score");
