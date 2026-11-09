@@ -5,6 +5,8 @@ import type { TrpcContext } from "./_core/context";
 import { getEditToken } from "./ruleReview";
 import { runEngine } from "./ruleEngine";
 import { createGianellaRule } from "../scripts/lib/gianella-2019.mjs";
+import fs from "node:fs";
+import { reviewLiterature } from "../scripts/lib/literature-review.mjs";
 
 vi.mock("./db", () => ({
   getAllOutcomes: vi.fn(),
@@ -80,6 +82,59 @@ describe("ロジスティック回帰の登録・編集API", () => {
     await expect(caller.rules.create({ ...logistic, ruleType: "nomogram" } as any)).rejects.toThrow("一致しません");
     await expect(caller.rules.create({ ...logistic, ruleDefinition: { ...logistic.ruleDefinition, outputMode: "binary" } } as any)).rejects.toThrow("判定閾値");
     expect(db.createRule).not.toHaveBeenCalled();
+  });
+});
+
+describe("Coxノモグラムの参考登録・編集API", () => {
+  const baseline = JSON.parse(fs.readFileSync(new URL("../scripts/local-literature.baseline.json", import.meta.url), "utf8"));
+  const existing = {
+    ...reviewLiterature(baseline.find((row: { id: number }) => row.id === 30005)),
+    evidenceLevel: "Cohort Study", isActive: true, consensusEligible: false,
+  };
+  const timeline = {
+    version: 1, anchor: "stroke_onset", kind: "future",
+    evaluation: { value: null, unit: "day", precision: "unknown", originalText: "入棟時", basis: "原著参照" },
+    target: { value: null, unit: "day", precision: "unknown", originalText: "原文の予測対象時点を参照", basis: "原著参照" },
+  };
+
+  it("参考用の定義で登録・編集でき、切片等を補わず集計は無効にする", async () => {
+    const definition = { ...existing.ruleDefinition, timeline };
+    await caller.rules.create({ ...existing, ruleDefinition: definition, consensusEligible: true } as any);
+    const created = vi.mocked(db.createRule).mock.calls[0][0];
+    expect(created).toMatchObject({ ruleType: "nomogram", consensusEligible: false, ruleDefinition: definition });
+    expect((created.ruleDefinition as any).intercept).toBeUndefined();
+    vi.mocked(db.getRuleById).mockResolvedValue(existing);
+    await caller.rules.update({ id: existing.id, editToken: getEditToken(existing), data: {
+      ruleDefinition: definition, consensusEligible: true,
+    } });
+    expect(db.updateRule).toHaveBeenCalledWith(existing.id, expect.objectContaining({
+      ruleDefinition: definition, consensusEligible: false,
+    }), getEditToken(existing));
+  });
+
+  it("参考登録でも不正な数値を保存しない", async () => {
+    await expect(caller.rules.create({ ...existing, ruleDefinition: {
+      ...existing.ruleDefinition, timeline,
+      variables: [{ field: "admission_age", coefficient: "不明" }],
+    } } as any)).rejects.toThrow("係数");
+    expect(db.createRule).not.toHaveBeenCalled();
+  });
+});
+
+describe("GUIで選んだ複数の適用対象の保存", () => {
+  it("病型の選択肢配列を変換せず保持し、照合でもORとして扱う", async () => {
+    const timeline = { version: 1, anchor: "stroke_onset", kind: "future",
+      evaluation: { value: null, unit: "day", precision: "unknown", originalText: "入院時", basis: "合成テスト" },
+      target: { value: null, unit: "day", precision: "unknown", originalText: "退院時", basis: "合成テスト" } };
+    const applyConditions = [{ field: "stroke_type", operator: "in", value: ["脳梗塞", "脳出血"], label: "病型" }];
+    await caller.rules.create({ ...rule, sourceUrl: "", applyConditions, ruleDefinition: { ...rule.ruleDefinition, timeline } } as any);
+    const saved = vi.mocked(db.createRule).mock.calls[0][0];
+    expect(saved.applyConditions).toEqual(applyConditions);
+    vi.mocked(db.getAllRules).mockResolvedValue([{ ...saved, id: 2 }] as any);
+    expect((await caller.rules.list({}))[0].applyConditionFields[0].label).toBe("病型：脳梗塞 または 脳出血のいずれか");
+    for (const stroke_type of ["脳梗塞", "脳出血"])
+      expect(runEngine([{ ...saved, id: 2 } as any], { stroke_type, bbs_score: 20 }).results[0].isPositive).toBe(true);
+    expect(runEngine([{ ...saved, id: 2 } as any], { stroke_type: "その他", bbs_score: 20 }).results[0].status).toBe("outside");
   });
 });
 

@@ -21,6 +21,10 @@ import {
   type NumericPredictionResult,
 } from "@/components/NumericPredictionResults";
 import { TimelineSummary } from "@/components/LiteratureTimeline";
+import { NomogramReferenceCard } from "@/components/NomogramReferenceCard";
+import { SavedInputsTable } from "@/components/SavedInputsTable";
+import { savedDateLabel, savedPhaseLabel } from "@/lib/savedAssessment";
+import { useLocation } from "wouter";
 import { useState } from "react";
 import { ASSESSMENT_PHASES } from "@shared/assessment";
 import { trpc } from "@/lib/trpc";
@@ -122,6 +126,7 @@ function PredictionRow({
   pred: PredictionRecord;
   outcomeName: string;
 }) {
+  const [, navigate] = useLocation();
   const [open, setOpen] = useState(false);
   const [outcomeDialogOpen, setOutcomeDialogOpen] = useState(false);
   const [outcomeValue, setOutcomeValue] = useState(
@@ -319,12 +324,17 @@ function PredictionRow({
                   : "旧履歴：計算版・ルール定義の記録はありません。"}
               </p>
               {detail?.prediction && (
-                <details className="text-xs">
-                  <summary className="cursor-pointer">保存された入力値</summary>
-                  <pre className="mt-2 whitespace-pre-wrap break-all rounded bg-muted p-2">
-                    {JSON.stringify(detail.prediction.patientInputs, null, 2)}
-                  </pre>
-                </details>
+                <section className="space-y-3" aria-label="保存された入力値">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div><h3 className="text-sm font-semibold">保存された入力値</h3>
+                      <p className="text-xs text-muted-foreground mt-1">評価日：{savedDateLabel(detail.prediction)} ／ {savedPhaseLabel(detail.prediction)}</p></div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" size="sm" onClick={() => navigate(`/?history=${pred.id}&reuse=repeat`)}>この入力で再照合</Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => navigate(`/?history=${pred.id}&reuse=followup`)}>次回評価へ引き継ぐ</Button>
+                    </div>
+                  </div>
+                  <SavedInputsTable inputs={detail.prediction.patientInputs} definitions={savedResults?.map(result => result.ruleSnapshot?.ruleDefinition)} />
+                </section>
               )}
               {/* 実績表示 */}
               {ao && (
@@ -402,7 +412,13 @@ function PredictionRow({
                             result => result.ruleId === r.ruleId
                           )
                       )
-                      .map(r => (
+                      .map(r => r.resultSnapshot?.referenceOnly ? (
+                        <NomogramReferenceCard key={r.id} result={{
+                          ...r.resultSnapshot,
+                          ...r,
+                          referenceOnly: r.resultSnapshot.referenceOnly,
+                        }} />
+                      ) : (
                         <div
                           key={r.id}
                           className={`flex items-start gap-2 text-xs p-2 rounded-md ${r.isApplicable ? (r.isPositive === null ? "bg-violet-50" : r.resultSnapshot?.consensusEligible !== true ? "bg-slate-50" : r.isPositive ? "bg-emerald-50" : "bg-red-50") : "bg-muted/50"}`}
@@ -427,6 +443,7 @@ function PredictionRow({
                                     supports: "集計対象：支持",
                                     against: "集計対象：困難示唆",
                                     reference: "参考結果",
+                                    literature: "参考文献（原文確認）",
                                     estimate: "数値予測",
                                     excluded: "判定対象外",
                                   }[

@@ -6,6 +6,7 @@ import { predictionTimeContext, usesKoyamaTimeAxis, hasKoyamaTimeAxis } from "@/
 import { koyamaSharedInputs, koyamaSharedInputSource } from "@/lib/koyamaSharedInputs";
 import { getFimTotalCalculation, withCalculatedFimTotals } from "@shared/patientFimTotals";
 import { FimTotalCalculation } from "@/components/FimTotalCalculation";
+import { NomogramReferenceCard } from "@/components/NomogramReferenceCard";
 import {
   timeQuerySchema,
   timeMatchLabel,
@@ -18,9 +19,9 @@ import {
   isConsensusResult,
   isContinuousResult,
   REFERENCE_RESULT_DESCRIPTION,
+  REFERENCE_LITERATURE_DESCRIPTION,
   type ResultDisplayStatus,
 } from "@shared/resultStatus";
-import { getRuleExclusionReason } from "@shared/ruleAvailability";
 const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
 import { TimelineSummary } from "@/components/LiteratureTimeline";
 import {
@@ -30,11 +31,17 @@ import {
 import { patientInputsSchema } from "@shared/patientValidation";
 import { omitInvalidPatientScores } from "@shared/patientScoreRanges";
 import { PatientNumberInput } from "@/components/PatientNumberInput";
+import { PatientModelPicker } from "@/components/PatientModelPicker";
+import { SavedAssessmentPicker } from "@/components/SavedAssessmentPicker";
+import { SavedInputsTable } from "@/components/SavedInputsTable";
+import { prepareSavedAssessment, readReuseContext, readReuseRequest, savedDateLabel, savedPhaseLabel, savedFieldName, savedFieldDefinitions, type ReuseContext, type ReuseMode, type SavedAssessment } from "@/lib/savedAssessment";
+import { useLocation, useSearch } from "wouter";
+import { createPatientModelPreset, type PatientModel, type PatientModelPhase } from "@shared/patientModels";
 import type {
   EngineOutput as EvaluationOutput,
   RuleEvaluationResult,
 } from "@shared/ruleEngine";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import {
@@ -141,6 +148,7 @@ import {
   PATIENT_FIELDS,
   ONSET_DAY_FIELD,
   ONSET_DAY_ALIASES,
+  getRequiredPatientFields,
   getVisiblePatientSections,
   type FieldDef,
 } from "@/lib/patientFields";
@@ -184,6 +192,13 @@ const RULE_STATUS_STYLES: Record<
     badge: string;
   }
 > = {
+  literature: {
+    label: "参考文献（原文確認）",
+    border: "border-slate-200",
+    bg: "bg-slate-50",
+    text: "text-slate-700",
+    badge: "border-slate-300 bg-slate-100 text-slate-700",
+  },
   reference: {
     label: "参考結果",
     border: "border-slate-200",
@@ -225,6 +240,7 @@ const RULE_STATUS_ORDER: RuleStatus[] = [
   "supports",
   "against",
   "reference",
+  "literature",
   "estimate",
   "excluded",
 ];
@@ -233,6 +249,7 @@ function groupRuleResults(
   results: RuleResult[]
 ): Record<RuleStatus, RuleResult[]> {
   const groups: Record<RuleStatus, RuleResult[]> = {
+    literature: [],
     reference: [],
     supports: [],
     against: [],
@@ -256,6 +273,7 @@ export function LiteratureSummary({ results }: { results: RuleResult[] }) {
       return acc;
     },
     {
+      literature: 0,
       reference: 0,
       supports: 0,
       against: 0,
@@ -266,7 +284,7 @@ export function LiteratureSummary({ results }: { results: RuleResult[] }) {
   const judgedCount =
     counts.supports + counts.against + counts.estimate + counts.reference;
   const primaryStatuses: RuleStatus[] = ["supports", "against"];
-  const secondaryStatuses: RuleStatus[] = ["reference", "excluded"];
+  const secondaryStatuses: RuleStatus[] = ["reference", "literature", "excluded"];
   const aggregatedResults = classificationResults.filter(isConsensusResult);
   const timingReviewCount = aggregatedResults.filter(
     r => requiresTimingReview(r.timeMatch)
@@ -330,7 +348,7 @@ export function LiteratureSummary({ results }: { results: RuleResult[] }) {
                 );
               })}
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {secondaryStatuses.map(status => {
                 const style = RULE_STATUS_STYLES[status];
                 return (
@@ -354,6 +372,9 @@ export function LiteratureSummary({ results }: { results: RuleResult[] }) {
               <p className="text-xs text-muted-foreground">
                 参考結果：{REFERENCE_RESULT_DESCRIPTION}
               </p>
+            )}
+            {counts.literature > 0 && (
+              <p className="text-xs text-muted-foreground">参考文献（原文確認）：{REFERENCE_LITERATURE_DESCRIPTION}</p>
             )}
           </CardContent>
         </Card>
@@ -383,6 +404,8 @@ function RuleResultCard({ result, classification = false }: { result: RuleResult
     ) : (
       <Info className="h-4 w-4 shrink-0 text-slate-500" />
     );
+
+  if (result.referenceOnly) return <NomogramReferenceCard result={{ ...result, referenceOnly: result.referenceOnly }} />;
 
   if (!result.isApplicable) {
     return (
@@ -729,6 +752,9 @@ export function LiteratureResults({
                         {REFERENCE_RESULT_DESCRIPTION}
                       </p>
                     )}
+                    {status === "literature" && (
+                      <p className="text-xs text-muted-foreground px-1">{REFERENCE_LITERATURE_DESCRIPTION}</p>
+                    )}
                     <div className="space-y-2">
                       {items.map(r => (
                         <RuleResultCard key={r.ruleId} result={r} />
@@ -753,6 +779,14 @@ export function LiteratureResults({
 }
 
 export default function PredictPage() {
+  const [, navigate] = useLocation();
+  const search = useSearch();
+  const reuseRequest = useMemo(() => readReuseRequest(search), [search]);
+  const appliedRequest = useRef<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [reuseContext, setReuseContext] = useState<ReuseContext | null>(null);
+  const [reuseWarnings, setReuseWarnings] = useState<string[]>([]);
+  const [reuseError, setReuseError] = useState("");
   const [selectedOutcomeId, setSelectedOutcomeId] = useState<number | null>(
     null
   );
@@ -773,8 +807,9 @@ export default function PredictPage() {
   const utils = trpc.useUtils();
   const [summaryScrollRequest, setSummaryScrollRequest] = useState(0);
 
-  const { data: outcomes, isLoading: outcomesLoading } =
+  const { data: outcomes, isLoading: outcomesLoading, error: outcomesError } =
     trpc.outcomes.list.useQuery();
+  const requestedHistory = trpc.history.get.useQuery({ id: reuseRequest?.id ?? 0 }, { enabled: Boolean(reuseRequest) });
   const predictionOutcomes = getPredictionOutcomes(outcomes ?? []);
   useEffect(() => {
     if (!outcomes) return;
@@ -803,41 +838,22 @@ export default function PredictPage() {
   const resultIsStale =
     result !== null && currentInputKey !== evaluatedInputKey;
   const requiredFields = useMemo(
-    () => {
-      const fields = new Set(
-        availableRules
-          ?.filter(
-            rule =>
-              rule.isActive && !getRuleExclusionReason(rule.ruleDefinition)
-          )
-          .flatMap(rule => [
-            ...rule.requiredFields,
-            ...rule.applyConditionFields.map(condition => condition.field),
-          ]) ?? []
-      );
-      if (fields.has("koyama_day_a")) fields.add("days_onset_to_admission");
-      if (fields.has("koyama_fim_total_a")) fields.add("admission_fim_total");
-      if (fields.has("admission_fim_total")) {
-        fields.add("admission_fim_motor_total");
-        fields.add("admission_fim_cognitive_total");
-      }
-      if (fields.has("fim_total")) {
-        fields.add("fim_motor_total");
-        fields.add("fim_cognitive_total");
-      }
-      return fields;
-    },
-    [availableRules]
+    () => getRequiredPatientFields(availableRules, isDemoMode ? undefined : timeContext.kind),
+    [availableRules, timeContext.kind]
   );
+  const displayedFields = new Set([
+    ...requiredFields,
+    ...(reuseContext ? Object.keys(enteredInputs) : []),
+  ]);
   const visibleSections = getVisiblePatientSections(
-    requiredFields, showAllFields
+    displayedFields, showAllFields
   );
   const knownFields = new Set(
     PATIENT_FIELDS.flatMap(section => section.fields.map(field => field.key))
   );
-  const unknownFields: FieldDef[] = Array.from(requiredFields)
+  const unknownFields: FieldDef[] = Array.from(displayedFields)
     .filter(field => !knownFields.has(field))
-    .map(key => ({ key, label: key, type: "number" }));
+    .map(key => savedFieldDefinitions.get(key) ?? ({ key, label: savedFieldName(key), type: typeof enteredInputs[key] === "boolean" ? "boolean" : typeof enteredInputs[key] === "string" && enteredInputs[key] !== "" && !Number.isFinite(Number(enteredInputs[key])) ? "text" : "number" }));
   if (unknownFields.length)
     visibleSections.push({
       section: "追加された文献の評価項目",
@@ -849,6 +865,7 @@ export default function PredictPage() {
       sessionStorage.setItem("rehab-local-draft-v2", JSON.stringify({
         ...JSON.parse(currentInputKey),
         inputs: enteredInputs,
+        reuseContext,
       }));
       toast.success("このタブに下書きを保存しました（タブを閉じるまで保持）");
     } catch {
@@ -881,6 +898,8 @@ export default function PredictPage() {
       );
       const restoredInputs = omitInvalidPatientScores(draft.inputs);
       setInputs(restoredInputs as PatientInputs);
+      setReuseContext(readReuseContext(draft.reuseContext));
+      setReuseWarnings([]);
       setSelectedOutcomeId(outcomes ? resolvePredictionOutcomeId(draft.outcomeId, outcomes) : draft.outcomeId);
       setCaseId(meta.caseId ?? "");
       if (meta.assessedOn) setAssessedOn(meta.assessedOn);
@@ -924,7 +943,7 @@ export default function PredictPage() {
     },
     onError: e => toast.error(`文献照合エラー: ${e.message}`),
   });
-  const isEvaluating = predictMutation.isPending || previewMutation.isPending;
+  const isEvaluating = predictMutation.isPending || previewMutation.isPending || Boolean(reuseRequest && (requestedHistory.isFetching || outcomesLoading));
 
   const fieldLookup = useMemo(() => {
     const map: Record<string, string> = {};
@@ -969,6 +988,11 @@ export default function PredictPage() {
   };
 
   const handleReset = () => {
+    appliedRequest.current = null;
+    if (reuseRequest) navigate("/", { replace: true });
+    setReuseContext(null);
+    setReuseWarnings([]);
+    setReuseError("");
     setInputs({});
     setTimeContext({ kind: "future" });
     setCaseId("");
@@ -982,6 +1006,57 @@ export default function PredictPage() {
       /* Browser storage may be disabled. */
     }
   };
+
+  const handleLoadPatientModel = (model: PatientModel, phase: PatientModelPhase) => {
+    setReuseContext(null);
+    setReuseWarnings([]);
+    const preset = createPatientModelPreset(model, phase);
+    setInputs(preset.inputs);
+    setCaseId(preset.caseId);
+    setAssessedOn(preset.assessedOn);
+    setAssessmentPhase(preset.assessmentPhase);
+    setTimeContext(preset.timeContext);
+    setResult(null);
+    setEvaluatedInputKey("");
+    setSavedPredictionId(null);
+    toast.success(`${model.name}（${ASSESSMENT_PHASES[phase]}）を入力しました`);
+  };
+
+  const loadSavedAssessment = useCallback((record: SavedAssessment, mode: ReuseMode) => {
+    const prepared = prepareSavedAssessment(record, mode, new Date().toLocaleDateString("en-CA"));
+    const resolvedOutcomeId = resolvePredictionOutcomeId(record.outcomeId, outcomes ?? []);
+    setInputs(prepared.inputs);
+    setCaseId(prepared.caseId);
+    setAssessedOn(prepared.assessedOn);
+    setAssessmentPhase(prepared.assessmentPhase);
+    setTimeContext(prepared.timeContext);
+    setSelectedOutcomeId(resolvedOutcomeId);
+    setReuseContext({ record: structuredClone(record), mode });
+    setReuseWarnings([...prepared.warnings,
+      ...(resolvedOutcomeId === null ? ["保存時のアウトカムは現在選択できません。照合するアウトカムを選択してください。"] : resolvedOutcomeId !== record.outcomeId ? ["保存時のアウトカムを現在の統合先へ切り替えました。選択内容を確認してください。"] : []),
+    ]);
+    setReuseError("");
+    setResult(null);
+    setEvaluatedInputKey("");
+    setSavedPredictionId(null);
+    setPickerOpen(false);
+    toast.success(mode === "repeat" ? "保存された入力を読み込みました" : "次回評価用に引き継ぎました");
+  }, [outcomes]);
+
+  useEffect(() => {
+    const record = requestedHistory.data?.prediction;
+    if (!reuseRequest || !record || requestedHistory.isFetching || requestedHistory.error || !outcomes || record.id !== reuseRequest.id) return;
+    const key = `${reuseRequest.id}:${reuseRequest.mode}`;
+    if (appliedRequest.current === key) return;
+    appliedRequest.current = key;
+    try {
+      loadSavedAssessment(record, reuseRequest.mode);
+      navigate("/", { replace: true });
+    } catch (error) {
+      appliedRequest.current = null;
+      setReuseError(error instanceof Error ? error.message : "保存された入力を読み込めませんでした");
+    }
+  }, [reuseRequest, requestedHistory.data, requestedHistory.isFetching, requestedHistory.error, outcomes, loadSavedAssessment, navigate]);
 
   const handlePredict = (save: boolean) => {
     if (!selectedOutcomeId) {
@@ -1061,6 +1136,32 @@ export default function PredictPage() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* ---- 左カラム: 入力フォーム ---- */}
         <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-base">保存済み症例から入力</CardTitle>
+              <CardDescription>過去の評価記録を選び、再照合や次回評価に利用できます。</CardDescription></CardHeader>
+            <CardContent><Button type="button" variant="outline" className="w-full" disabled={isEvaluating || outcomesLoading} onClick={() => setPickerOpen(true)}>保存済み症例を選択</Button></CardContent>
+          </Card>
+          <SavedAssessmentPicker open={pickerOpen} onOpenChange={setPickerOpen} disabled={isEvaluating || outcomesLoading} caseId={caseId} onLoad={(record, mode) => {
+            try { loadSavedAssessment(record, mode); } catch (error) { toast.error(error instanceof Error ? error.message : "入力を読み込めませんでした"); }
+          }} />
+          {reuseRequest && (requestedHistory.isFetching || outcomesLoading) && <p role="status" className="text-sm text-muted-foreground">保存された評価記録を読み込んでいます…</p>}
+          {(reuseError || requestedHistory.error || outcomesError) && reuseRequest && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm space-y-2">
+            <p>記録を読み込めませんでした：{reuseError || requestedHistory.error?.message || outcomesError?.message}</p>
+            <Button type="button" variant="outline" onClick={() => { setReuseError(""); requestedHistory.refetch(); utils.outcomes.list.invalidate(); }}>再読み込み</Button>
+            <Button type="button" variant="ghost" onClick={() => { setReuseError(""); navigate("/", { replace: true }); }}>閉じる</Button>
+          </div>}
+          {reuseContext && <Card className="border-blue-200 bg-blue-50/40">
+            <CardHeader className="pb-3"><CardTitle className="text-base">{reuseContext.mode === "repeat" ? "保存された入力を読み込みました" : "次回評価用に引き継ぎました"}</CardTitle>
+              <CardDescription>元の記録：{reuseContext.record.caseId ? `症例 ${reuseContext.record.caseId}` : "症例ID未登録"} ／ 履歴 #{reuseContext.record.id}<br />
+                {reuseContext.mode === "followup" ? "前回の評価日" : "保存時の評価日"}：{savedDateLabel(reuseContext.record)} ／ {savedPhaseLabel(reuseContext.record)}</CardDescription></CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <p>{reuseContext.mode === "repeat" ? "保存時の値・評価日・時間軸を読み込んでいます。現在の文献で新たに照合します。過去の結果は履歴で確認できます。" : "症例ID・入院時などの既往評価・固定情報を引き継いでいます。今回の測定値・変化量・時間軸の日数を入力し、評価日も確認してください。"}</p>
+              {reuseWarnings.length > 0 && <ul className="list-disc pl-5 space-y-1 text-xs text-amber-800">{reuseWarnings.map(warning => <li key={warning}>{warning}</li>)}</ul>}
+              <details className="rounded-md border bg-background p-3"><summary className="cursor-pointer text-sm font-medium">{reuseContext.mode === "followup" ? "前回の評価値を参照" : "元の保存入力を確認"}（{savedDateLabel(reuseContext.record)}）</summary>
+                <div className="mt-3"><SavedInputsTable inputs={reuseContext.record.patientInputs} /></div>
+              </details>
+            </CardContent>
+          </Card>}
           {/* アウトカム選択 */}
           <Card>
             <CardHeader className="pb-3">
@@ -1193,7 +1294,7 @@ export default function PredictPage() {
             すべての評価項目を表示
           </label>
           <p className="text-xs text-muted-foreground">
-            通常は選択したアウトカムの計算に必要な項目を表示します。入院時の項目には当時の値を入力してください。未評価の値は空欄のままにできます。
+            通常は選択したアウトカム{!isDemoMode && "と将来予測／同時点の判別"}に必要な項目を表示します。入院時の項目には当時の値を入力してください。未評価の値は空欄のままにできます。
             {(assessmentPhase === "admission" || assessmentPhase === "week3") && (
               <>
                 {" "}
@@ -1282,6 +1383,8 @@ export default function PredictPage() {
                             ))}
                           </SelectContent>
                         </Select>
+                      ) : field.type === "text" ? (
+                        <Input id={`patient-${field.key}`} className="h-8 text-sm flex-1" value={String(inputs[field.key] ?? "")} onChange={event => handleInputChange(field.key, event.target.value)} />
                       ) : (
                         <div className="flex items-center gap-1.5 flex-1">
                           <PatientNumberInput
@@ -1425,7 +1528,7 @@ export default function PredictPage() {
                         追加評価の提案
                       </CardTitle>
                       <CardDescription className="text-amber-700">
-                        以下の評価を追加すると、判定できる文献が増えます
+                        以下の評価を追加すると、照合・原文参照に使える文献が増えます
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-2">
@@ -1467,6 +1570,9 @@ export default function PredictPage() {
                 )}
               </LiteratureResults>
             </>
+          )}
+          {!result && (
+            <PatientModelPicker onLoad={handleLoadPatientModel} disabled={isEvaluating} />
           )}
         </div>
       </div>

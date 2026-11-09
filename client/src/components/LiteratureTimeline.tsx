@@ -30,9 +30,11 @@ const selectStyle = "w-full h-9 rounded-md border px-2 bg-background text-sm";
 export function TimelineEditor({
   value,
   onChange,
+  required = false,
 }: {
   value: LiteratureTimeline;
   onChange: (t: LiteratureTimeline) => void;
+  required?: boolean;
 }) {
   const pointEditor = (key: "evaluation" | "target", title: string) => {
     const p = value[key]!;
@@ -184,7 +186,7 @@ export function TimelineEditor({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        時間軸の入力は任意です。未入力でもプレビューの更新・登録ができます。
+        {required ? "新規登録では時間軸を入力してください。日数が不明な場合は、原著の表記や確認できない理由を記録してください。" : "時間軸の入力は任意です。既存文献の未登録の時点を推測で補完する必要はありません。"}
       </p>
       <p className="text-sm">
         評価時点・予測対象時点は、どちらも発症日を0日とした日数で登録します。照合範囲はそれぞれ個別に設定できます。

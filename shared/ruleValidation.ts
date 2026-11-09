@@ -1,6 +1,7 @@
 import { literatureTimelineSchema } from "./literatureTimeline";
 import { z } from "zod";
 import { KOYAMA_FORMULA, KOYAMA_FIELDS } from "./koyama";
+import { readNomogramReference } from "./ruleAvailability";
 
 const finite = z.number().finite();
 const field = z.string().regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, "評価項目名が不正です");
@@ -10,9 +11,41 @@ const value = z.union([finite, z.string(), z.boolean()]);
 const messages = { positiveMessage: text, negativeMessage: text };
 const variable = z.object({ field, fieldLabel: text.optional(), unit: z.string().optional() }).passthrough();
 
-export const applyConditionSchema = z.object({
-  field, operator, value, label: z.string().optional(),
+const calculatedNomogramSchema = z.object({
+  type: z.literal("nomogram"), ...messages, intercept: finite,
+  modelType: z.literal("logistic").optional(),
+  outputMode: z.enum(["binary", "probability"]).optional(),
+  variables: z.array(variable.extend({ coefficient: finite, categoryMap: z.record(z.string(), finite).optional() })).min(1),
+  probabilityThreshold: finite.min(0).max(1).optional(),
 }).passthrough();
+
+function definitionIssueMessage(error: z.ZodError): string {
+  const details = error.issues.slice(0, 3).map(issue => {
+    const names: Record<string, string> = {
+      intercept: "切片", coefficient: "係数", field: "評価項目名",
+      fieldLabel: "評価項目の表示名", modelType: "モデルの種類",
+      variables: "評価項目", positiveMessage: "支持の場合のメッセージ",
+      negativeMessage: "困難の場合のメッセージ",
+    };
+    const path = issue.path.map(part => typeof part === "number" ? `${part + 1}番目` : names[String(part)] ?? String(part)).join("・") || "ルール全体";
+    const expected = issue.code === "invalid_type" ? issue.expected : undefined;
+    const message = expected === "number" ? "有限の数値で入力してください"
+      : expected === "string" ? "文字列で入力してください"
+      : expected === "array" ? "項目の配列を入力してください"
+      : issue.code === "invalid_value" ? "指定された選択肢の値を入力してください"
+      : issue.message;
+    return `${path}：${message}`;
+  });
+  return `ルール定義の必須項目・型・数値を確認してください（${details.join("／")}）`;
+}
+
+export const applyConditionSchema = z.object({
+  field, operator: z.enum([...operator.options, "in", "not_in"]),
+  value: z.union([value, z.array(value).min(1)]), label: z.string().optional(),
+}).passthrough().superRefine((condition, ctx) => {
+  if (["in", "not_in"].includes(condition.operator) !== Array.isArray(condition.value))
+    ctx.addIssue({ code: "custom", path: ["value"], message: "複数選択の条件では1つ以上の値を選択し、通常の比較では値を1つ指定してください" });
+});
 
 const logicNode: z.ZodType = z.lazy(() => z.discriminatedUnion("logic", [
   z.object({ logic: z.literal("CONDITION"), field, fieldLabel: text.optional(), operator, value: value.optional() }).passthrough(),
@@ -38,10 +71,13 @@ export const ruleDefinitionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("scoring_system"), ...messages, threshold: finite, maxScore: finite,
     items: z.array(variable.extend({ bands: z.array(z.object({ operator, value: value.optional(), score: finite, label: text }).passthrough()).min(1) })).min(1),
   }).passthrough(),
-  z.object({ type: z.literal("nomogram"), ...messages, intercept: finite,
-    modelType: z.literal("logistic").optional(),
+  // Reference-only models do not need a fabricated intercept or coefficients.
+  // Supplied numeric values still have to be valid, even when not calculated.
+  z.object({ type: z.literal("nomogram"), intercept: finite.optional(),
+    positiveMessage: z.string().optional(), negativeMessage: z.string().optional(),
+    modelType: text.optional(),
     outputMode: z.enum(["binary", "probability"]).optional(),
-    variables: z.array(variable.extend({ coefficient: finite, categoryMap: z.record(z.string(), finite).optional() })).min(1),
+    variables: z.array(variable.extend({ coefficient: finite.optional(), categoryMap: z.record(z.string(), finite).optional() })).min(1),
     probabilityThreshold: finite.min(0).max(1).optional(),
   }).passthrough(),
   z.object({ type: z.literal("logistic_regression"), intercept: finite,
@@ -71,8 +107,12 @@ export function validateRuleDefinition(input: unknown): string | null {
     }
   }
   const parsed = ruleDefinitionSchema.safeParse(input);
-  if (!parsed.success) return "ルール定義の必須項目・型・数値を確認してください";
+  if (!parsed.success) return definitionIssueMessage(parsed.error);
   const def = parsed.data;
+  if (def.type === "nomogram" && !readNomogramReference(def)) {
+    const calculation = calculatedNomogramSchema.safeParse(def);
+    if (!calculation.success) return definitionIssueMessage(calculation.error);
+  }
   if (def.type === "custom_formula") {
     if (def.outputMode !== "continuous" &&
         (def.threshold === undefined || !def.positiveMessage || !def.negativeMessage))

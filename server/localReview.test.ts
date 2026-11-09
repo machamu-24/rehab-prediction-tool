@@ -16,7 +16,9 @@ describe('原著照合後の通常版モデル', () => {
     expect(baseline).toHaveLength(17);
     for(const original of baseline) {
       const r = reviewLiterature(original);
-      if([30005,60007,60008,60009].includes(r.id)) {
+      if(r.id === 30005) {
+        expect(runEngine([r],{}).results[0]).toMatchObject({ status:'missing_input', isPositive:null, probability:null, referenceOnly:{reason:expect.stringContaining('ベースライン生存関数')} });
+      } else if([60007,60008,60009].includes(r.id)) {
         expect(runEngine([r],{}).results[0]).toMatchObject({ status:'unsupported', isPositive:null });
       } else expect(validateRuleDefinition(r.ruleDefinition),r.name).toBeNull();
     }

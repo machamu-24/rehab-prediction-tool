@@ -1,3 +1,6 @@
+import { readTimeline, type TimeQuery } from "@shared/literatureTimeline";
+import { getRuleExclusionReason, readNomogramReference } from "@shared/ruleAvailability";
+
 export type FieldDef = {
   key: string;
   label: string;
@@ -107,6 +110,44 @@ PATIENT_FIELDS.splice(1, 0, {
   ],
 });
 PATIENT_FIELDS[0].fields.push({ key: "months_since_onset", label: "評価時点の発症後月数", type: "number", unit: "ヶ月", placeholder: "例: 8" });
+
+type PatientFieldRule = {
+  isActive: boolean;
+  ruleDefinition: unknown;
+  requiredFields: readonly string[];
+  applyConditionFields: readonly { field: string }[];
+};
+
+export function getRequiredPatientFields(
+  rules: readonly PatientFieldRule[] | undefined,
+  kind?: TimeQuery["kind"]
+): Set<string> {
+  const fields = new Set(
+    rules
+      ?.filter(rule => {
+        if (!rule.isActive || (getRuleExclusionReason(rule.ruleDefinition) && !readNomogramReference(rule.ruleDefinition))) return false;
+        const timeline = readTimeline(rule.ruleDefinition);
+        // Unknown dates must not hide fields needed to complete the assessment.
+        return !kind || !timeline || timeline.kind === kind;
+      })
+      .flatMap(rule => [
+        ...rule.requiredFields,
+        ...rule.applyConditionFields.map(condition => condition.field),
+      ]) ?? []
+  );
+  if (fields.has("koyama_day_a")) fields.add("days_onset_to_admission");
+  if (fields.has("koyama_fim_total_a")) fields.add("admission_fim_total");
+  if (fields.has("admission_fim_total")) {
+    fields.add("admission_fim_motor_total");
+    fields.add("admission_fim_cognitive_total");
+  }
+  if (fields.has("fim_total")) {
+    fields.add("fim_motor_total");
+    fields.add("fim_cognitive_total");
+  }
+  return fields;
+}
+
 export function getVisiblePatientSections(
   requiredFields: ReadonlySet<string>,
   showAllFields: boolean

@@ -1,5 +1,6 @@
 import { isConsensusResult, readContinuousOutput } from "../shared/resultStatus";
-import { getRuleExclusionReason } from "../shared/ruleAvailability";
+import { applyConditionLabel } from "../shared/applyConditionLabel";
+import { getRuleExclusionReason, readNomogramReference } from "../shared/ruleAvailability";
 import {
   matchTimeline,
   type TimeQuery,
@@ -52,6 +53,7 @@ import type {
 
 export type EvaluationStatus =
   | "evaluated"
+  | "reference_only"
   | "missing_input"
   | "outside"
   | "unsupported"
@@ -59,6 +61,11 @@ export type EvaluationStatus =
   | "calculation_error";
 
 export type RuleEvaluationResult = {
+  referenceOnly?: {
+    reason: string;
+    requiredFields: string[];
+    conditions: string[];
+  };
   timeline?: LiteratureTimeline | null;
   timeMatch?: TimeMatch;
   status: EvaluationStatus;
@@ -139,8 +146,13 @@ function numVal(inputs: PatientInputs, field: string): number {
 function compareOp(
   val: unknown,
   operator: string,
-  threshold: number | string | boolean | undefined
+  threshold: number | string | boolean | Array<number | string | boolean> | undefined
 ): boolean {
+  if (operator === "in" || operator === "not_in") {
+    if (!Array.isArray(threshold) || !threshold.length) throw new Error("比較対象の選択肢が未設定です");
+    const includes = threshold.some(value => value === val);
+    return operator === "in" ? includes : !includes;
+  }
   if (
     ["<=", ">=", "<", ">"].includes(operator) &&
     ((typeof val !== "number" && typeof val !== "boolean") ||
@@ -192,7 +204,7 @@ function checkApplyConditions(
         reason: `適用条件の評価に必要な項目「${cond.label ?? cond.field}」が未入力です。`,
       };
     }
-    if (!compareOp(v, cond.operator, cond.value as number)) {
+    if (!compareOp(v, cond.operator, cond.value)) {
       return {
         ok: false,
         reason: `適用条件: ${cond.label ?? cond.field} ${cond.operator} ${cond.value}（現在値: ${v}）のため適用外です。`,
@@ -216,6 +228,8 @@ export function extractRequiredFieldsFromDef(
   }
 }
 function extractRequiredFields(def: RuleDefinition): string[] {
+  const reference = readNomogramReference(def);
+  if (reference) return reference.variables.map(variable => variable.field);
   switch (def.type) {
     case "cutoff": {
       const fields = [def.field];
@@ -734,6 +748,46 @@ function evalCustomFormula(
 // メイン評価関数
 // ============================================================
 
+function evaluateNomogramReference(
+  rule: LiteratureRule,
+  inputs: PatientInputs,
+  reference: NonNullable<ReturnType<typeof readNomogramReference>>
+): RuleEvaluationResult {
+  const summary = buildLiteratureSummary(rule, rule.ruleDefinition);
+  summary.predictors = reference.variables.map(variable => variable.fieldLabel || variable.field);
+  const parsed = applyConditionSchema.array().safeParse(rule.applyConditions ?? []);
+  if (!parsed.success)
+    return makeInapplicable(rule, summary, "適用条件の定義が不正です", "invalid_definition");
+  const definition = rule.ruleDefinition as RuleDefinition & { timeline?: unknown };
+  if (definition.timeline !== undefined && !readTimeline(definition))
+    return makeInapplicable(rule, summary, "時間軸の設定が不正です", "invalid_definition");
+  const conditions = parsed.data as ApplyCondition[];
+  const requiredFields = Array.from(new Set([
+    ...reference.variables.map(variable => variable.field),
+    ...conditions.map(condition => condition.field),
+  ]));
+  const missingFields = requiredFields.filter(field =>
+    inputs[field] === undefined || inputs[field] === null || inputs[field] === ""
+  );
+  const availableConditions = conditions.filter(condition => !missingFields.includes(condition.field));
+  const applicability = checkApplyConditions(availableConditions, inputs);
+  const status = !applicability.ok ? "outside" : missingFields.length ? "missing_input" : "reference_only";
+  return {
+    ...makeInapplicable(rule, summary, !applicability.ok ? applicability.reason : reference.reason, status, missingFields),
+    consensusEligible: false,
+    referenceOnly: {
+      reason: reference.reason,
+      requiredFields,
+      conditions: conditions.map(applyConditionLabel),
+    },
+    matchExplanation: [
+      missingFields.length ? "必要な評価項目に未入力があります。" : "登録された必要項目は入力済みです。予測値は算出していません。",
+      conditions.length ? "登録済みの適用条件のみを照合しています。" : "適用条件は構造化されていません。",
+      "対象集団・評価時点・予測対象時点は原文で確認してください。支持・困難の集計には含めません。",
+    ],
+  };
+}
+
 export function evaluateRule(
   rule: LiteratureRule,
   inputs: PatientInputs
@@ -751,6 +805,9 @@ export function evaluateRule(
         `入力値を確認してください: ${validation.error.issues.map(issue => issue.path.join(".")).join(", ")}`
       );
     const def = rule.ruleDefinition;
+    const reference = readNomogramReference(def);
+    if (rule.ruleType === "nomogram" && reference)
+      return evaluateNomogramReference(rule, inputs, reference);
     const metadata = def as RuleDefinition & { modelType?: string };
     const exclusionReason = getRuleExclusionReason(def);
     if (exclusionReason) {
@@ -973,7 +1030,10 @@ export function runEngine(
       const result = evaluateRule(rule, inputs);
       const isKoyama = rule.ruleDefinition.type === "custom_formula" && rule.ruleDefinition.modelType === "koyama_fim_total";
       if (import.meta.env?.VITE_DEMO_MODE === "true" && !isKoyama) return result;
-      const timeMatch = isKoyama ? matchKoyamaTime() : matchTimeline(result.timeline ?? null, timeContext);
+      const matchedTime = isKoyama ? matchKoyamaTime() : matchTimeline(result.timeline ?? null, timeContext);
+      const timeMatch = result.referenceOnly && matchedTime.status !== "mismatch"
+        ? { ...matchedTime, reason: "文献の評価時点・予測対象時点は原文で確認してください。時点の確認状態にかかわらず、支持・困難の集計には含めません。" }
+        : matchedTime;
       const compared = {
         ...result,
         timeMatch,
@@ -983,7 +1043,7 @@ export function runEngine(
       };
       if (
         timeMatch.status === "mismatch" &&
-        ["evaluated", "missing_input", "outside"].includes(result.status)
+        ["evaluated", "reference_only", "missing_input", "outside"].includes(result.status)
       ) {
         return {
           ...compared,
@@ -993,7 +1053,7 @@ export function runEngine(
           numericValue: null,
           prediction: null,
           probability: null,
-          missingFields: [],
+          missingFields: result.referenceOnly ? result.missingFields : [],
           details: [],
           unavailableReason: timeMatch.reason,
           matchExplanation: [timeMatch.reason],

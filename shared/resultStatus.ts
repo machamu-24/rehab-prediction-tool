@@ -2,6 +2,7 @@ export type ResultStatus =
   | "supports"
   | "against"
   | "reference"
+  | "literature"
   | "estimate"
   | "unknown"
   | "outside";
@@ -42,6 +43,7 @@ export function getResultStatus(r: {
   isPositive: boolean | null;
   status?: string;
 }): ResultStatus {
+  if (r.status === "reference_only") return "literature";
   if (!r.isApplicable) return r.status === "outside" ? "outside" : "unknown";
   if (r.isPositive === null) return "estimate";
   return isConsensusResult(r)
@@ -66,6 +68,8 @@ export function getExclusionReasonLabel(result: { status?: string }): string {
   switch (result.status) {
     case "missing_input":
       return "入力不足";
+    case "reference_only":
+      return "原文確認";
     case "outside":
       return "条件不一致";
     case "unsupported":
@@ -81,3 +85,6 @@ export function getExclusionReasonLabel(result: { status?: string }): string {
 
 export const REFERENCE_RESULT_DESCRIPTION =
   "必要な評価項目はそろっており、結果を確認できる文献です。対象期間・時点の違いや不明点、数値予測・研究内割合などのため、支持・困難の集計には含めず、参考として表示しています。各文献の時期と理由を確認してください。";
+
+export const REFERENCE_LITERATURE_DESCRIPTION =
+  "登録された必要項目が入力済みの文献です。自動計算は行っていません。対象集団・評価時点・予測対象時点を原文で確認してください。支持・困難の集計とその分母には含めません。";

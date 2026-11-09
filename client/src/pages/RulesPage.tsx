@@ -3,7 +3,10 @@ import { TimelineEditor, TimelineSummary, emptyTimeline } from "@/components/Lit
 import { parseOptionalTimeline, readTimeline, type LiteratureTimeline } from "@shared/literatureTimeline";
 import { PATIENT_FIELDS } from "@/lib/patientFields";
 import { validateRuleDefinition } from "@shared/ruleValidation";
-import { useState } from "react";
+import { readNomogramReference } from "@shared/ruleAvailability";
+import { ApplyConditionsEditor, CutoffExtraConditions, RuleDefinitionEditor, emptyRuleDraft } from "@/components/RuleDefinitionEditor";
+import { compileApplyConditions, compileRuleDraft, describeCondition, isReferenceDraft, previewFields, previewRuleLines, record, requiredNumber, type RuleDraft } from "@/lib/ruleForm";
+import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -120,127 +123,13 @@ const EVIDENCE_COLORS: Record<string, string> = {
 
 const EASY_RULE_TYPES = new Set(["cutoff", "regression"]);
 
-// ルール定義のサンプルテンプレート
+// 新規入力は原著の値を入力してからプレビューする。
 const RULE_DEFINITION_TEMPLATES: Record<string, string> = {
-  cutoff: JSON.stringify({
-    type: "cutoff",
-    field: "bbs_score",
-    fieldLabel: "Berg Balance Scale (BBS)",
-    operator: ">=",
-    threshold: 14,
-    unit: "点",
-    positiveMessage: "歩行自立の可能性が高い（BBS ≥ 14）",
-    negativeMessage: "歩行介助が必要な可能性（BBS < 14）",
-  }, null, 2),
-  decision_tree: JSON.stringify({
-    type: "decision_tree",
-    nodes: [
-      { id: "root", field: "sitting_balance_30s", fieldLabel: "座位保持30秒", operator: "boolean", trueNodeId: "check_bbs", falseNodeId: "leaf_neg" },
-      { id: "check_bbs", field: "bbs_score", fieldLabel: "BBS", operator: ">=", threshold: 14, trueNodeId: "leaf_pos", falseNodeId: "leaf_neg" },
-      { id: "leaf_pos", isLeaf: true, isPositive: true, message: "歩行自立の可能性が高い" },
-      { id: "leaf_neg", isLeaf: true, isPositive: false, message: "歩行自立は不確実" },
-    ],
-  }, null, 2),
-  regression: JSON.stringify({
-    type: "regression",
-    formula: "予測スコア = -5.2 + 0.15 * BBS + 0.08 * FIM運動 - 0.05 * 年齢",
-    intercept: -5.2,
-    coefficients: [
-      { field: "bbs_score", fieldLabel: "BBS", coefficient: 0.15 },
-      { field: "fim_motor", fieldLabel: "FIM運動", coefficient: 0.08 },
-      { field: "age", fieldLabel: "年齢", coefficient: -0.05 },
-    ],
-    threshold: 15,
-    positiveMessage: "予測スコアが閾値以上です",
-    negativeMessage: "予測スコアが閾値未満です",
-  }, null, 2),
-  scoring_system: JSON.stringify({
-    type: "scoring_system",
-    items: [
-      { field: "nihss", fieldLabel: "NIHSS", unit: "点", bands: [
-        { operator: "<=", value: 5, score: 3, label: "軽症" },
-        { operator: "<=", value: 15, score: 2, label: "中等症" },
-        { operator: ">", value: 15, score: 0, label: "重症" },
-      ]},
-    ],
-    threshold: 2,
-    maxScore: 3,
-    positiveMessage: "良好な転帰が期待できる",
-    negativeMessage: "転帰不良のリスクあり",
-  }, null, 2),
-  logistic_regression: JSON.stringify({
-    type: "logistic_regression",
-    outputMode: "probability",
-    description: "切片と係数を文献の非標準化回帰係数に置き換えてください。オッズ比は代入しません。",
-    intercept: 0,
-    variables: [
-      { field: "admission_bbs_score", fieldLabel: "入院時BBS", coefficient: 0 },
-    ],
-  }, null, 2),
-  nomogram: JSON.stringify({
-    type: "nomogram",
-    intercept: -3.5,
-    variables: [
-      { field: "age", fieldLabel: "年齢", coefficient: -0.04 },
-      { field: "nihss", fieldLabel: "NIHSS", coefficient: -0.18 },
-      { field: "bbs_score", fieldLabel: "BBS", coefficient: 0.12 },
-    ],
-    probabilityThreshold: 0.5,
-    positiveMessage: "転帰良好の確率 ≥ 50%",
-    negativeMessage: "転帰良好の確率 < 50%",
-  }, null, 2),
-  composite_rule: JSON.stringify({
-    type: "composite_rule",
-    root: {
-      logic: "OR",
-      children: [
-        { logic: "AND", children: [
-          { logic: "CONDITION", field: "sex", fieldLabel: "性別", operator: "==", value: "男性" },
-          { logic: "CONDITION", field: "nihss", fieldLabel: "NIHSS", operator: "<=", value: 7.5 },
-        ]},
-        { logic: "AND", children: [
-          { logic: "CONDITION", field: "sex", fieldLabel: "性別", operator: "==", value: "女性" },
-          { logic: "CONDITION", field: "nihss", fieldLabel: "NIHSS", operator: "<=", value: 5.5 },
-        ]},
-      ],
-    },
-    positiveMessage: "カットオフ以下（良好な転帰）",
-    negativeMessage: "カットオフ超過（転帰不良リスク）",
-  }, null, 2),
-  custom_formula: JSON.stringify({
-    type: "custom_formula",
-    formula: "0.3 * bbs_score + 0.2 * tct_score - 0.1 * nihss",
-    formulaDescription: "BBS、TCT、NIHSSから予測スコアを計算",
-    variables: [
-      { field: "bbs_score", fieldLabel: "BBS", unit: "点" },
-      { field: "tct_score", fieldLabel: "TCT", unit: "点" },
-      { field: "nihss", fieldLabel: "NIHSS", unit: "点" },
-    ],
-    threshold: 15,
-    positiveMessage: "スコア ≥ 15: 良好な転帰が期待できる",
-    negativeMessage: "スコア < 15: 転帰不良のリスクあり",
-  }, null, 2),
+  cutoff: JSON.stringify({ type: "cutoff", field: "", fieldLabel: "", operator: ">=", threshold: "", positiveMessage: "", negativeMessage: "" }, null, 2),
+  regression: JSON.stringify({ type: "regression", intercept: "", coefficients: [], outputMode: "binary" }, null, 2),
 };
 
-type ConditionOperator = "<=" | ">=" | "<" | ">" | "==" | "!=" | "equals" | "boolean" | "boolean_negative";
-
-type ApplyConditionForm = {
-  field: string;
-  label: string;
-  operator: ConditionOperator;
-  value: string;
-};
-
-const APPLY_CONDITION_OPERATORS: { value: string; label: string }[] = [
-  { value: "<=", label: "≤ 以下" },
-  { value: ">=", label: "≥ 以上" },
-  { value: "<",  label: "< 未満" },
-  { value: ">",  label: "> 超" },
-  { value: "==", label: "= 等しい" },
-  { value: "!=",     label: "≠ 等しくない" },
-  { value: "boolean", label: "boolean（真偽値）" },
-  { value: "boolean_negative", label: "boolean（偽）" },
-];
+type ApplyConditionForm = RuleDraft;
 
 const PATIENT_FIELD_OPTIONS = [
   ...PATIENT_FIELDS.flatMap(section => section.fields).filter(field => field.key.startsWith("admission_") || field.key.startsWith("koyama_") || ["prestroke_mrs", "months_since_onset", "spatial_neglect", "cognitive_impairment", "first_stroke", "prestroke_adl_independent", "supratentorial_stroke", "hemiparesis_present"].includes(field.key)).map(field => ({ value: field.key, label: field.label })),
@@ -335,6 +224,7 @@ type RulePreview = {
   definition: Record<string, unknown>;
   requiredFields: string[];
   logicLines: string[];
+  conditions: ReturnType<typeof compileApplyConditions>;
 };
 
 const defaultForm: RuleForm = {
@@ -357,10 +247,10 @@ const defaultForm: RuleForm = {
 };
 
 const defaultCutoffBuilder: CutoffBuilderForm = {
-  field: "bbs_score",
-  fieldLabel: "BBS",
+  field: "",
+  fieldLabel: "",
   operator: ">=",
-  threshold: "14",
+  threshold: "",
   unit: "点",
   positiveMessage: "歩行自立の可能性が高い",
   negativeMessage: "歩行自立は困難な可能性",
@@ -369,12 +259,12 @@ const defaultCutoffBuilder: CutoffBuilderForm = {
 const defaultRegressionBuilder: RegressionBuilderForm = {
   outputMode: "binary", outputUnit: "点",
   formula: "予測スコア = 切片 + 各係数 × 評価値",
-  intercept: "0",
-  threshold: "0",
+  intercept: "",
+  threshold: "",
   positiveMessage: "予測値が閾値以上です",
   negativeMessage: "予測値が閾値未満です",
   coefficients: [
-    { field: "bbs_score", fieldLabel: "BBS", coefficient: "0.1", unit: "点" },
+    { field: "", fieldLabel: "", coefficient: "", unit: "" },
   ],
 };
 
@@ -382,49 +272,8 @@ function patientFieldLabel(value: string): string {
   return PATIENT_FIELD_OPTIONS.find((f) => f.value === value)?.label ?? value;
 }
 
-function normalizeConditionOperator(operator: unknown): ConditionOperator {
-  if (operator === "equals") return "==";
-  if (
-    operator === "<=" ||
-    operator === ">=" ||
-    operator === "<" ||
-    operator === ">" ||
-    operator === "==" ||
-    operator === "!=" ||
-    operator === "boolean" ||
-    operator === "boolean_negative"
-  ) {
-    return operator;
-  }
-  return ">=";
-}
-
 function parseRequiredNumber(value: string, label: string): number {
-  const n = Number(value);
-  if (value.trim() === "" || Number.isNaN(n)) {
-    throw new Error(`${label}を数値で入力してください`);
-  }
-  return n;
-}
-
-function extractPreviewFields(def: Record<string, unknown>): string[] {
-  if (def.type === "cutoff") {
-    const fields = [String(def.field ?? "")];
-    const secondary = Array.isArray(def.secondaryConditions) ? def.secondaryConditions : [];
-    for (const cond of secondary) {
-      if (cond && typeof cond === "object" && "field" in cond) {
-        fields.push(String((cond as { field?: unknown }).field ?? ""));
-      }
-    }
-    return fields.filter(Boolean);
-  }
-  if (def.type === "regression") {
-    const coefficients = Array.isArray(def.coefficients) ? def.coefficients : [];
-    return coefficients
-      .map((coef) => coef && typeof coef === "object" ? String((coef as { field?: unknown }).field ?? "") : "")
-      .filter(Boolean);
-  }
-  return [];
+  return requiredNumber(value, label);
 }
 
 type LiteratureRule = {
@@ -446,6 +295,7 @@ type LiteratureRule = {
 
 export default function RulesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("basic");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [editTarget, setEditTarget] = useState<(LiteratureRule & {editToken?:string}) | null>(null);
   const [form, setForm] = useState<RuleForm>(defaultForm);
@@ -489,14 +339,22 @@ export default function RulesPage() {
   });
 
   const isEasyRuleType = EASY_RULE_TYPES.has(form.ruleType);
+  const referenceNomogram = useMemo(() => {
+    try {
+      return isReferenceDraft(record(JSON.parse(form.ruleDefinition)));
+    } catch {
+      return null;
+    }
+  }, [form.ruleDefinition]);
   const previewKey = JSON.stringify({
-    form: isEasyRuleType ? { ...form, ruleDefinition: "" } : form,
+    form,
     cutoffBuilder,
     regressionBuilder,
   });
   const previewIsCurrent = preview?.key === previewKey;
 
   const openCreate = () => {
+    setActiveTab("basic");
     setEditTarget(null);
     setForm(defaultForm);
     setCutoffBuilder(defaultCutoffBuilder);
@@ -507,6 +365,7 @@ export default function RulesPage() {
   };
 
   const openEdit = (r: LiteratureRule & { ruleDefinition?: unknown; applyConditions?: unknown }) => {
+    setActiveTab("basic");
     setEditTarget(r);
     const rawConds = Array.isArray(r.applyConditions) ? r.applyConditions as Array<Record<string, unknown>> : [];
     const def = r.ruleDefinition && typeof r.ruleDefinition === "object"
@@ -538,7 +397,7 @@ export default function RulesPage() {
               return {
                 field,
                 fieldLabel: String(coef.fieldLabel ?? patientFieldLabel(field)),
-                coefficient: String(coef.coefficient ?? "0"),
+                coefficient: String(coef.coefficient ?? ""),
                 unit: String(coef.unit ?? ""),
               };
             })
@@ -560,8 +419,7 @@ export default function RulesPage() {
       applyConditions: rawConds.map((c) => ({
         field: String(c.field ?? ""),
         label: String(c.label ?? ""),
-        operator: normalizeConditionOperator(c.operator),
-        value: String(c.value ?? ""),
+        ...c,
       })),
       accuracy: r.accuracy?.toString() ?? "",
       sensitivity: r.sensitivity?.toString() ?? "",
@@ -580,7 +438,7 @@ export default function RulesPage() {
     setForm((f) => ({
       ...f,
       ruleType: v,
-      ruleDefinition: RULE_DEFINITION_TEMPLATES[v] ?? "{}",
+      ruleDefinition: EASY_RULE_TYPES.has(v) ? RULE_DEFINITION_TEMPLATES[v] : JSON.stringify(emptyRuleDraft(v), null, 2),
     }));
     setPreview(null);
     if (v === "cutoff") setCutoffBuilder(defaultCutoffBuilder);
@@ -680,16 +538,16 @@ export default function RulesPage() {
     }
 
     try {
-      const parsed = JSON.parse(form.ruleDefinition);
+      const parsed: unknown = JSON.parse(form.ruleDefinition);
       if (!parsed || typeof parsed !== "object") {
         throw new Error("ルール定義JSONはオブジェクトで入力してください");
       }
       return {
         definition: parsed as Record<string, unknown>,
-        logicLines: ["詳細JSONからルール定義を読み込みます"],
+        logicLines: previewRuleLines(compileRuleDraft(record(parsed), false)),
       };
     } catch (e) {
-      setJsonError("JSONの形式が正しくありません");
+      if (e instanceof SyntaxError) setJsonError("JSONの形式が正しくありません");
       throw e instanceof Error ? e : new Error("JSONの形式が正しくありません");
     }
   };
@@ -700,25 +558,32 @@ export default function RulesPage() {
     if (!form.source.trim()) { toast.warning("文献情報を入力してください"); return; }
 
     try {
-      const { definition, logicLines } = buildRuleDefinition();
+      const built = buildRuleDefinition();
+      const definition = compileRuleDraft(built.definition, false);
+      const logicLines = built.logicLines;
       if (import.meta.env.VITE_DEMO_MODE !== "true") {
         const timeline = parseOptionalTimeline(form.timeline);
         if (timeline) definition.timeline = timeline;
         else delete definition.timeline;
+        if (!editTarget && !definition.timeline) {
+          setActiveTab("timeline");
+          throw new Error("時間軸を登録してください。日数が不明な場合は、原著の表記や確認できない理由を入力してください。");
+        }
       }
       const definitionError = validateRuleDefinition(definition);
       if (definitionError) throw new Error(definitionError);
-      const requiredFields = Array.from(new Set(extractPreviewFields(definition)));
-      if (isEasyRuleType) {
-        setForm((f) => ({ ...f, ruleDefinition: JSON.stringify(definition, null, 2) }));
-      }
+      if (definition.type !== form.ruleType) throw new Error("選択したルールタイプと定義が一致しません。ルールタイプを確認してください。");
+      const conditions = compileApplyConditions(form.applyConditions);
+      const requiredFields = Array.from(new Set([...previewFields(definition), ...conditions.map(condition => condition.field)]));
       setPreview({
         key: previewKey,
         definition,
         requiredFields,
-        logicLines,
+        logicLines: form.ruleType === "cutoff" ? [...logicLines, ...(Array.isArray(definition.secondaryConditions) ? definition.secondaryConditions.map(condition => `補助条件：${describeCondition(record(condition))}`) : [])] : logicLines,
+        conditions,
       });
       setJsonError(null);
+      setActiveTab("preview");
       toast.success("プレビューを更新しました");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "プレビューを作成できませんでした");
@@ -738,18 +603,13 @@ export default function RulesPage() {
       source: form.source,
       sourceUrl: form.sourceUrl || undefined,
       evidenceLevel: form.evidenceLevel as "Systematic Review" | "RCT" | "Cohort Study" | "Case-Control" | "Expert Classification" | "Other",
-      applyConditions: form.applyConditions.map((c) => ({
-        field: c.field,
-        label: c.label || (PATIENT_FIELD_OPTIONS.find((f) => f.value === c.field)?.label ?? c.field),
-        operator: normalizeConditionOperator(c.operator),
-        value: c.value === "true" ? true : c.value === "false" ? false : c.value.trim() !== "" && !isNaN(Number(c.value)) ? Number(c.value) : c.value,
-      })),
+      applyConditions: preview.conditions,
       ruleDefinition: preview.definition,
       accuracy: form.accuracy ? Number(form.accuracy) : null,
       sensitivity: form.sensitivity ? Number(form.sensitivity) : null,
       specificity: form.specificity ? Number(form.specificity) : null,
       auc: form.auc ? Number(form.auc) : null,
-      consensusEligible: form.consensusEligible,
+      consensusEligible: readNomogramReference(preview.definition) ? false : form.consensusEligible,
       isActive: form.isActive,
       sortOrder: Number(form.sortOrder) || 0,
     };
@@ -900,7 +760,7 @@ export default function RulesPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <Tabs defaultValue="basic" className="mt-2">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
             <TabsList className="grid h-auto w-full grid-cols-2 sm:grid-cols-6">
               <TabsTrigger value="basic" className="text-xs sm:text-sm">基本情報</TabsTrigger>
               {import.meta.env.VITE_DEMO_MODE !== "true" && <TabsTrigger value="timeline" className="text-xs sm:text-sm">時間軸</TabsTrigger>}
@@ -991,10 +851,12 @@ export default function RulesPage() {
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
                   <Switch
-                    checked={form.consensusEligible}
+                    checked={referenceNomogram ? false : form.consensusEligible}
+                    disabled={Boolean(referenceNomogram)}
                     onCheckedChange={(v) => setForm((f) => ({ ...f, consensusEligible: v }))}
                   />
                   <Label className="text-sm">コンセンサス集計に含める</Label>
+                  {referenceNomogram && <span className="text-xs text-muted-foreground">参考文献は集計対象外です</span>}
                 </div>
                 <div className="flex items-center gap-2">
                   <Switch
@@ -1006,7 +868,7 @@ export default function RulesPage() {
               </div>
             </TabsContent>
 
-            {import.meta.env.VITE_DEMO_MODE !== "true" && <TabsContent value="timeline" className="mt-4"><TimelineEditor value={form.timeline} onChange={timeline=>setForm(f=>({...f,timeline}))}/></TabsContent>}
+            {import.meta.env.VITE_DEMO_MODE !== "true" && <TabsContent value="timeline" className="mt-4"><TimelineEditor required={!editTarget} value={form.timeline} onChange={timeline=>setForm(f=>({...f,timeline}))}/></TabsContent>}
 
             {/* 適用条件タブ */}
             <TabsContent value="conditions" className="space-y-3 mt-4">
@@ -1017,88 +879,7 @@ export default function RulesPage() {
                   <p>このルールが適用されるための前提条件を設定します。例：「発症日数 ≤ 7」を設定すると、発症7日以内の患者にのみ適用されます。</p>
                 </div>
               </div>
-              {form.applyConditions.map((cond, idx) => (
-                <div key={idx} className="flex items-end gap-2 p-3 border rounded-lg bg-muted/30">
-                  <div className="flex-1 space-y-1">
-                    <Label className="text-xs">フィールド</Label>
-                    <Select
-                      value={cond.field}
-                      onValueChange={(v) => setForm((f) => ({
-                        ...f,
-                        applyConditions: f.applyConditions.map((c, i) => i === idx ? { ...c, field: v } : c),
-                      }))}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="項目を選択" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PATIENT_FIELD_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="w-28 space-y-1">
-                    <Label className="text-xs">演算子</Label>
-                    <Select
-                      value={cond.operator}
-                      onValueChange={(v) => setForm((f) => ({
-                        ...f,
-                        applyConditions: f.applyConditions.map((c, i) => i === idx ? { ...c, operator: v as ConditionOperator } : c),
-                      }))}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {APPLY_CONDITION_OPERATORS.map((op) => (
-                          <SelectItem key={op.value} value={op.value}>{op.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="w-24 space-y-1">
-                    <Label className="text-xs">値</Label>
-                    <Input
-                      className="h-8 text-xs"
-                      placeholder="例: 7"
-                      value={cond.value}
-                      onChange={(e) => setForm((f) => ({
-                        ...f,
-                        applyConditions: f.applyConditions.map((c, i) => i === idx ? { ...c, value: e.target.value } : c),
-                      }))}
-                    />
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
-                    onClick={() => setForm((f) => ({
-                      ...f,
-                      applyConditions: f.applyConditions.filter((_, i) => i !== idx),
-                    }))}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ))}
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full gap-2"
-                onClick={() => setForm((f) => ({
-                  ...f,
-                  applyConditions: [...f.applyConditions, { field: "days_post_stroke", label: "", operator: "<=" as ConditionOperator, value: "7" }],
-                }))}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                条件を追加
-              </Button>
-              {form.applyConditions.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-4">
-                  適用条件なし（全患者に適用）
-                </p>
-              )}
+              <ApplyConditionsEditor value={form.applyConditions} onChange={applyConditions => setForm(f => ({ ...f, applyConditions }))} />
             </TabsContent>
 
             {/* ルール定義タブ */}
@@ -1106,8 +887,8 @@ export default function RulesPage() {
               <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200">
                 <Info className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
                 <div className="text-xs text-blue-700">
-                  <p className="font-medium mb-1">{isEasyRuleType ? "フォーム入力から判定ルールを作成します" : "このルールタイプは詳細JSON編集です"}</p>
-                  <p>{isEasyRuleType ? "入力内容から内部のルール定義を自動生成します。登録前にプレビューで内容を確認してください。" : "決定木・複合条件などは従来の詳細JSONで編集します。登録前プレビューは必須です。"}</p>
+                  <p className="font-medium mb-1">フォーム入力から判定ルールを作成します</p>
+                  <p>評価項目・条件・文献の数値を入力し、登録前のプレビューで内容を確認してください。</p>
                 </div>
               </div>
 
@@ -1194,6 +975,8 @@ export default function RulesPage() {
                   </div>
                 </div>
               )}
+
+              {form.ruleType === "cutoff" && <CutoffExtraConditions value={form.ruleDefinition} onChange={ruleDefinition => setForm(f => ({ ...f, ruleDefinition }))} />}
 
               {form.ruleType === "regression" && (
                 <div className="space-y-4">
@@ -1347,21 +1130,9 @@ export default function RulesPage() {
               )}
 
               {!isEasyRuleType && (
-                <div className="space-y-1.5">
-                  <Label>ルール定義（JSON）</Label>
-                  <Textarea
-                    className="font-mono text-xs min-h-64"
-                    value={form.ruleDefinition}
-                    onChange={(e) => {
-                      setForm((f) => ({ ...f, ruleDefinition: e.target.value }));
-                      validateJson(e.target.value);
-                      setPreview(null);
-                    }}
-                  />
-                  {jsonError && (
-                    <p className="text-xs text-destructive">{jsonError}</p>
-                  )}
-                </div>
+                <RuleDefinitionEditor key={`${editTarget?.id ?? "new"}-${form.ruleType}`} value={form.ruleDefinition} onChange={value => {
+                  setForm(f => ({ ...f, ruleDefinition: value })); validateJson(value); setPreview(null);
+                }} />
               )}
             </TabsContent>
 
@@ -1486,6 +1257,10 @@ export default function RulesPage() {
                             <span className="text-xs text-muted-foreground">ルール定義から自動抽出できる評価項目はありません</span>
                           )}
                         </div>
+                      </div>
+                      <div className="rounded-lg border p-3 space-y-1 text-sm">
+                        <p className="font-medium">適用条件（すべて満たす）</p>
+                        {preview.conditions.length ? preview.conditions.map((condition, index) => <p key={index}>{describeCondition(condition)}</p>) : <p className="text-muted-foreground">追加の適用条件は設定されていません。</p>}
                       </div>
                     </CardContent>
                   </Card>

@@ -35,7 +35,7 @@ describe("文献モデルと結果の信頼性", () => {
   });
   it("Coxモデルをロジスティック回帰として計算しない", () => {
     const output = runEngine([find(30005)], sample);
-    expect(output.results[0]).toMatchObject({ status: "unsupported", isApplicable: false, isPositive: null, probability: null });
+    expect(output.results[0]).toMatchObject({ status: "reference_only", isApplicable: false, isPositive: null, probability: null, consensusEligible: false });
     expect(output.consensus.negativeCount).toBe(0);
     expect(output.consensus.score).toBeNull();
   });

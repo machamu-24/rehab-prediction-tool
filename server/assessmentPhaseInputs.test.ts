@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import { getAssessmentFieldPhase, getInputsForAssessmentPhase, isAssessmentFieldAvailable } from "../shared/assessment";
-import { getVisiblePatientSections } from "../client/src/lib/patientFields";
+import { getRequiredPatientFields, getVisiblePatientSections } from "../client/src/lib/patientFields";
 import { patientInputsSchema } from "../shared/patientValidation";
 import { reviewLiterature } from "../scripts/lib/literature-review.mjs";
 import { extractRequiredFieldsFromDef, runEngine } from "./ruleEngine";
@@ -10,6 +10,70 @@ import type { LiteratureRule } from "../drizzle/schema";
 const baseline = JSON.parse(fs.readFileSync(new URL("../scripts/local-literature.baseline.json", import.meta.url), "utf8"));
 const rule = reviewLiterature(baseline.find((row: LiteratureRule) => row.id === 30006)) as LiteratureRule;
 const inputs = { admission_fim_motor_total: 40, admission_age: 60, delta_bbs: 21, delta_fim_motor: 0, delta_fim_cognitive: -1 };
+
+const kneeRules = [30001, 30002].map(id => {
+  const rule = reviewLiterature(baseline.find((row: LiteratureRule) => row.id === id)) as LiteratureRule;
+  return {
+    ...rule,
+    ruleDefinition: {
+      ...rule.ruleDefinition,
+      timeline: {
+        version: 1, anchor: "stroke_onset", kind: "concurrent",
+        evaluation: { value: null, unit: "day", precision: "unknown" },
+      },
+    },
+    requiredFields: extractRequiredFieldsFromDef(rule.ruleDefinition),
+    applyConditionFields: [],
+  };
+});
+const visibleKeys = (fields: ReadonlySet<string>, showAll = false) =>
+  getVisiblePatientSections(fields, showAll).flatMap(section => section.fields.map(field => field.key));
+
+describe("予測種別に応じた膝伸展筋力の表示", () => {
+  it("将来予測では非表示、日数未指定の同時点判別では両側の入力欄を表示する", () => {
+    const kneeFields = ["knee_ext_paretic_nm_kg", "knee_ext_total_nm_kg"];
+    const future = visibleKeys(getRequiredPatientFields(kneeRules, "future"));
+    for (const field of kneeFields) expect(future).not.toContain(field);
+    expect(visibleKeys(getRequiredPatientFields(kneeRules, "concurrent")))
+      .toEqual(expect.arrayContaining(kneeFields));
+    expect(visibleKeys(getRequiredPatientFields(kneeRules, "future"), true))
+      .toEqual(expect.arrayContaining(kneeFields));
+    // The demo has no prediction-kind selector and keeps its existing fields.
+    expect(visibleKeys(getRequiredPatientFields(kneeRules)))
+      .toEqual(expect.arrayContaining(kneeFields));
+  });
+
+  it("将来予測文献が筋力を必要とする場合は適用条件の項目も含めて表示する", () => {
+    const futureRule = {
+      ...kneeRules[0],
+      ruleDefinition: {
+        ...kneeRules[0].ruleDefinition,
+        timeline: {
+          ...kneeRules[0].ruleDefinition.timeline,
+          kind: "future",
+          target: { value: null, unit: "day", precision: "unknown" },
+        },
+      },
+      applyConditionFields: [{ field: "admission_fim_walk" }],
+    };
+    const fields = getRequiredPatientFields([...kneeRules, futureRule], "future");
+    expect(visibleKeys(fields)).toContain("knee_ext_paretic_nm_kg");
+    expect(visibleKeys(fields)).not.toContain("knee_ext_total_nm_kg");
+    expect(fields.has("admission_fim_walk")).toBe(true);
+  });
+
+  it("時間軸未登録の文献を隠さず、無効・計算対象外の文献は表示候補から除く", () => {
+    const { timeline, ...definition } = kneeRules[0].ruleDefinition;
+    const legacy = { ...kneeRules[0], ruleDefinition: definition };
+    expect(visibleKeys(getRequiredPatientFields([legacy], "future")))
+      .toContain("knee_ext_paretic_nm_kg");
+    expect(getRequiredPatientFields([{ ...legacy, isActive: false }], "future").size).toBe(0);
+    expect(getRequiredPatientFields([{
+      ...legacy,
+      ruleDefinition: { ...definition, evidenceReview: { status: "blocked", reason: "情報不足" } },
+    }], "future").size).toBe(0);
+  });
+});
 
 describe("評価時点に応じた変化量の送信", () => {
   it("入院時は既存の変化量を使って変化量モデルを判定しない", () => {

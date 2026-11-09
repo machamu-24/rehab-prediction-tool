@@ -1,4 +1,6 @@
 import { RULE_TYPES } from "../shared/ruleTypes";
+import { readNomogramReference } from "../shared/ruleAvailability";
+import { applyConditionLabel } from "../shared/applyConditionLabel";
 import { serializeCsv } from "../shared/csv";
 import { getResultStatus } from "../shared/resultStatus";
 import { actualOutcomeSchema } from "../shared/actualOutcome";
@@ -157,8 +159,7 @@ export const appRouter = router({
                 }>
               ).map(c => ({
                 field: c.field,
-                label:
-                  `${c.label ?? c.field} ${c.operator} ${c.value ?? ""}`.trim(),
+                label: applyConditionLabel(c),
               }))
             : [],
         }));
@@ -191,6 +192,7 @@ export const appRouter = router({
         ...input,
         ruleDefinition: prepareRuleEdit(undefined, input),
         sourceUrl: input.sourceUrl || null,
+        consensusEligible: readNomogramReference(input.ruleDefinition) ? false : input.consensusEligible,
         accuracy: input.accuracy ?? null,
         sensitivity: input.sensitivity ?? null,
         specificity: input.specificity ?? null,
@@ -239,6 +241,7 @@ export const appRouter = router({
           });
         const data = { ...input.data };
         data.ruleDefinition = prepareRuleEdit(existing, input.data);
+        if (readNomogramReference(data.ruleDefinition)) data.consensusEligible = false;
         if ("sourceUrl" in data && !data.sourceUrl) {
           (data as Record<string, unknown>).sourceUrl = null;
         }
