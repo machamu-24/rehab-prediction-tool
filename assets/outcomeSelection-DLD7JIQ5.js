@@ -1,0 +1,1 @@
+const u="FIM運動項目",i="発症90日後の運動FIM >61点",o=new Set([i,"退院時の運動FIM >61点","退院時FIS身体自立度 ≥5"]);function c(n){return n.filter(e=>!o.has(e.name))}function s(n,e){if(n===null)return null;const t=e.find(r=>r.id===n);return t?.name===i?e.find(r=>r.name===u)?.id??null:t&&!o.has(t.name)?n:null}export{u as F,c as g,s as r};
