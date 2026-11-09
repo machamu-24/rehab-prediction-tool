@@ -2,6 +2,8 @@
 
 **静的デモ版:** [https://machamu-24.github.io/rehab-prediction-tool/](https://machamu-24.github.io/rehab-prediction-tool/)
 
+**Windows・Mac用の通常版配布:** [GitHub Releases](https://github.com/machamu-24/rehab-prediction-tool/releases) ／ [初回設定・起動手順](docs/RELEASE_GUIDE.md)。Node.js 24以上・MySQL 8.0以上が必要です。ビルド済みアプリと最新文献を同梱し、新規利用は照合履歴0件から開始します。
+
 脳卒中リハビリテーション領域の予後予測研究で報告されたカットオフ値、決定木、スコアリング、回帰式などを登録し、患者情報と文献ルールを照合するWebアプリケーションです。  
 現在の画面上では「予測」というより、入力条件に対して登録済み文献が何を支持するかを整理する「文献照合」ツールとして扱っています。
 
