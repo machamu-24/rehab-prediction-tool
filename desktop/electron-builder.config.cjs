@@ -1,3 +1,15 @@
+// GitHub supplies unset Secrets as empty strings; builder otherwise treats CSC_LINK
+// as a path to the current directory. Leave absent credentials truly absent.
+for (const name of [
+  "CSC_LINK",
+  "CSC_KEY_PASSWORD",
+  "APPLE_ID",
+  "APPLE_APP_SPECIFIC_PASSWORD",
+  "APPLE_TEAM_ID",
+]) {
+  if (process.env[name] !== undefined && !process.env[name].trim())
+    delete process.env[name];
+}
 module.exports = {
   appId: "jp.machamu.rehabpredict",
   productName: "RehabPredict",
