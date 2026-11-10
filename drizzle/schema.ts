@@ -1,3 +1,4 @@
+// Legacy MySQL schema and shared record types. Desktop runtime DDL is in server/sqliteStore.ts.
 import {
   int,
   mysqlEnum,

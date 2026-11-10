@@ -1,4 +1,4 @@
-name: Build and publish local release
+name: Build and publish desktop installers
 
 on:
   push:
@@ -15,13 +15,9 @@ permissions:
   contents: read
 
 jobs:
-  platform-check:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -32,12 +28,31 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm test
-      - run: pnpm build:release
-      - run: pnpm test:release
+      - name: Verify static demo still builds
+        run: pnpm build:demo
 
-  mysql-check:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
+  installers:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            arch: x64
+          - os: macos-latest
+            platform: mac
+            arch: arm64
+          - os: macos-15-intel
+            platform: mac
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      CSC_LINK: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_LINK || matrix.platform == 'win' && secrets.WIN_CSC_LINK || '' }}
+      CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_KEY_PASSWORD || matrix.platform == 'win' && secrets.WIN_CSC_KEY_PASSWORD || '' }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -46,48 +61,45 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build:release
-      - name: Start local MySQL for integration test
-        run: |
-          sudo systemctl start mysql.service
-      - run: node scripts/test-release.mjs --mysql
+      - run: pnpm check
+      - run: pnpm test
+      - name: Build desktop application
+        run: pnpm build:desktop
+      - name: Build installer and audit its contents
+        run: pnpm exec electron-builder --config desktop/electron-builder.config.cjs --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+      - name: Install and test actual application
+        run: node scripts/test-built-installer.mjs
         env:
-          REHAB_RELEASE_TEST_MYSQL: mysql://root:root@127.0.0.1:3306/
-      - name: Verify ZIP contents and executable modes
-        run: |
-          python3 - <<'PY'
-          import zipfile, glob, json
-          name = glob.glob('dist/release/*.zip')[0]
-          with zipfile.ZipFile(name) as z:
-              assert z.testzip() is None
-              assert all('/.env' not in n and '/backups/' not in n and '/node_modules/' not in n for n in z.namelist())
-              for i in z.infolist():
-                  if i.filename.endswith('.command'):
-                      assert (i.external_attr >> 16) & 0o111
-              seed = json.loads(z.read(next(n for n in z.namelist() if n.endswith('/release/literature.seed.json'))))
-              assert sorted(seed['payload']['tables']) == ['literature_rules', 'outcomes']
-          PY
+          REHAB_DESKTOP_REPORT_DIR: dist/installer-reports
       - uses: actions/upload-artifact@v4
         with:
-          name: local-release
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
-            dist/release/*.zip
-            dist/release/SHA256SUMS.txt
+            dist/installers/*.exe
+            dist/installers/*.dmg
+            dist/installer-reports/*.json
           if-no-files-found: error
+          retention-days: 7
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v') || inputs.publish == true
-    needs: [platform-check, mysql-check]
-    runs-on: ubuntu-latest
+    needs: [tests, installers]
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
       - uses: actions/download-artifact@v4
         with:
-          name: local-release
+          pattern: desktop-*
+          merge-multiple: true
           path: release-assets
-      - name: Publish verified release
+      - name: Verify complete artifact set and create checksums
+        run: node scripts/prepare-installer-release.mjs
+      - name: Publish installers
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
@@ -95,7 +107,7 @@ jobs:
           VERSION_TAG="v$(node -p 'require("./package.json").version')"
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             test "$RELEASE_TAG" = "$VERSION_TAG"
-            gh release create "$VERSION_TAG" release-assets/* --verify-tag --title "RehabPredict $VERSION_TAG（Windows・Mac通常版）" --notes-file release/RELEASE_NOTES.md --latest
+            gh release create "$VERSION_TAG" release-assets/*.exe release-assets/*.dmg release-assets/SHA256SUMS.txt release-assets/INSTALLER_TESTS.json --verify-tag --title "RehabPredict $VERSION_TAG（実行環境・SQLite内蔵）" --notes-file release/RELEASE_NOTES.md --latest
           else
-            gh release create "$VERSION_TAG" release-assets/* --target "$GITHUB_SHA" --title "RehabPredict $VERSION_TAG（Windows・Mac通常版）" --notes-file release/RELEASE_NOTES.md --latest
+            gh release create "$VERSION_TAG" release-assets/*.exe release-assets/*.dmg release-assets/SHA256SUMS.txt release-assets/INSTALLER_TESTS.json --target "$GITHUB_SHA" --title "RehabPredict $VERSION_TAG（実行環境・SQLite内蔵）" --notes-file release/RELEASE_NOTES.md --latest
           fi

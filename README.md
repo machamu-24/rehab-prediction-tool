@@ -2,7 +2,7 @@
 
 **静的デモ版:** [https://machamu-24.github.io/rehab-prediction-tool/](https://machamu-24.github.io/rehab-prediction-tool/)
 
-**Windows・Mac用の通常版配布:** [GitHub Releases](https://github.com/machamu-24/rehab-prediction-tool/releases) ／ [初回設定・起動手順](docs/RELEASE_GUIDE.md)。Node.js 24以上・MySQL 8.0以上が必要です。ビルド済みアプリと最新文献を同梱し、新規利用は照合履歴0件から開始します。
+**Windows・Mac用の通常版配布:** [GitHub Releases](https://github.com/machamu-24/rehab-prediction-tool/releases) ／ [初回設定・起動手順](docs/RELEASE_GUIDE.md)。Node.js・MySQLの個別導入は不要です。実行環境とSQLite、最新文献を同梱し、新規利用は照合履歴0件から開始します。
 
 脳卒中リハビリテーション領域の予後予測研究で報告されたカットオフ値、決定木、スコアリング、回帰式などを登録し、患者情報と文献ルールを照合するWebアプリケーションです。  
 現在の画面上では「予測」というより、入力条件に対して登録済み文献が何を支持するかを整理する「文献照合」ツールとして扱っています。
@@ -73,7 +73,7 @@
 
 ロジスティック回帰は、フォームで切片・各変数の非標準化回帰係数・必要なカテゴリ変換・出力方法を設定します。確率の閾値や研究内割合は画面で％入力し、内部では0〜1の値を保持します。`outputMode: "probability"` は確率のみを表示し、`"binary"` は文献に基づく `probabilityThreshold` と判定メッセージを必須とします。確率だけの結果を0.5で自動分類することはありません。適用条件では病型などの「次のいずれかに一致」を複数選択でき、条件の行どうしはANDで照合します。
 
-既存DBへのタイプ追加は `pnpm local:migrate` で適用できます。既にノモグラムとして登録したGianellaら2019を移行する場合は、`node scripts/migrate-logistic-regression.mjs --apply` を実行します。実行前にバックアップを作成し、文献の係数・アウトカム・過去の照合履歴を保持します。`--apply` なしでは変更内容の確認のみを行います。
+現在の文献は8タイプに対応したSQLiteへ初回起動時に取り込みます。旧MySQL版専用の `migrate-*.mjs`・`seed*.mjs` はSQLiteへ適用しません。旧データの移行はJSONバックアップから画面上で行えます。
 
 ---
 
@@ -85,79 +85,28 @@
 | UI | Radix UI, lucide-react, shadcn/ui系コンポーネント |
 | 状態・API | TanStack Query, tRPC 11 |
 | バックエンド | Express 4 |
-| データベース | MySQL / TiDB Cloud互換 |
-| ORM・マイグレーション | Drizzle ORM / drizzle-kit |
+| データベース | 内蔵SQLite（node:sqlite）。旧MySQLは移行用の読み出しのみ |
+| デスクトップ・配布 | Electron 45 / electron-builder、Windows NSIS・Mac DMG |
 | テスト | Vitest |
 | 静的デモ | `VITE_DEMO_MODE=true` + GitHub Pages |
 
 ---
 
-## ローカル起動
+## ローカル起動（開発用ソース）
 
-### 前提条件
+一般の利用者は [配布インストーラー](https://github.com/machamu-24/rehab-prediction-tool/releases/latest) を使用してください。以下は開発者向けです。
 
-| ソフトウェア | 目安 |
-|--------------|------|
-| Node.js | 20以上 |
-| pnpm | 10以上 |
-| MySQL互換DB | ローカルMySQLまたはTiDB Cloudなど |
+Node.js 24以上とpnpm 10を用意し、次を実行します。MySQLは不要です。
 
-### 1. 依存関係のインストール
-
-```bash
-git clone https://github.com/machamu-24/rehab-prediction-tool.git
-cd rehab-prediction-tool
-pnpm install
+```sh
+pnpm install --frozen-lockfile
+pnpm local:start
 ```
 
-### 2. `.env` を作成
+SQLiteの初期化と文献の取り込みは自動です。`.env` は任意で、`PORT` と `REHAB_DATA_DIR` を設定できます。標準ポートは3020です。既存のMySQL接続設定ではなくSQLiteを使用します。
 
-```env
-DATABASE_URL=mysql://root:password@localhost:3306/rehab_predict
-JWT_SECRET=change-this-to-a-random-secret-string
-NODE_ENV=development
-PORT=3000
+デスクトップ版のビルドは `pnpm desktop:dist`、型チェックとテストは `pnpm check`・`pnpm test` です。詳細は [配布手順](docs/RELEASE_GUIDE.md) を参照してください。
 
-# Manus OAuthを使う場合のみ設定
-VITE_APP_ID=
-OAUTH_SERVER_URL=
-VITE_OAUTH_PORTAL_URL=
-OWNER_OPEN_ID=
-BUILT_IN_FORGE_API_URL=
-BUILT_IN_FORGE_API_KEY=
-VITE_FRONTEND_FORGE_API_URL=
-VITE_FRONTEND_FORGE_API_KEY=
-```
-
-`.env` はコミットしないでください。ローカル開発ではOAuth未設定でも、公開tRPC手続きとして主要機能を操作できます。
-
-### 3. DB作成・マイグレーション
-
-```sql
-CREATE DATABASE rehab_predict CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-```bash
-pnpm db:push
-```
-
-### 4. 初期データ投入
-
-```bash
-node scripts/seed.mjs
-node scripts/seed_literature.mjs
-node scripts/seed_gdrive_literature.mjs
-```
-
-### 5. 開発サーバー起動
-
-```bash
-pnpm dev
-```
-
-通常は `http://localhost:3000/` で起動します。3000番ポートが使用中の場合は、サーバーログに表示された別ポートを開いてください。
-
----
 
 ## 静的デモ版
 
@@ -187,7 +136,10 @@ GitHub Pagesへのデプロイは `.github/workflows/deploy-demo-pages.yml` で�
 | `pnpm start` | 本番ビルド済みサーバー起動 |
 | `pnpm test` | Vitest実行 |
 | `pnpm check` | TypeScript型チェック |
-| `pnpm db:push` | Drizzleマイグレーション生成・適用 |
+| `pnpm desktop:dist` | 実行したOS用のデスクトップアプリ・インストーラー作成 |
+| `pnpm local:backup` | SQLiteのJSONバックアップを作成 |
+| `pnpm export:release-literature` | 利用中のSQLiteから配布用の最新文献だけを書き出す |
+| `pnpm db:push` | 旧MySQL版用。現在のSQLiteには使わない |
 | `pnpm export:demo-data` | ローカルDBから静的デモ用スナップショットを出力 |
 | `pnpm generate:demo-data` | スナップショットから静的デモ用データ生成 |
 | `pnpm refresh:demo-data` | ローカルDBからスナップショットと静的データを再生成 |

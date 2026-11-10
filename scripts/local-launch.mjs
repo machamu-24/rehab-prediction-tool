@@ -17,12 +17,12 @@ const openBrowser = address => {
 };
 try {
   const response = await fetch(`${url}api/local/health`, { signal: AbortSignal.timeout(1200) });
-  if ((await response.json()).app === 'rehab-prediction-tool') {
+  const health = await response.json();
+  if (health.app === 'rehab-prediction-tool' && health.storage === 'sqlite') {
     console.log(`通常版は起動済みです: ${url}（終了は既存の起動用ターミナルでControl + C）`);
     openBrowser(url); process.exit(0);
   }
 } catch { /* Not running yet. */ }
-if (!fs.existsSync('.env')) throw new Error('.envがありません。docs/LOCAL_USER_GUIDE.mdの初期設定を確認してください');
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 console.log('通常版をビルドしています…');
 const build = spawnSync(pnpm, ['build'], { cwd: root, stdio: 'inherit', env: { ...process.env, VITE_DEMO_MODE: 'false' } });

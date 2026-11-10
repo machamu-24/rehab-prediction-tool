@@ -107,6 +107,14 @@ rehab_db_backup_*.sql
 *.db
 *.sqlite
 *.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.db-wal
+*.db-shm
+active-db.json
+active-db-*.tmp
 
 # Webdev artifacts (checkpoint zips, migrations, etc.)
 .webdev/
