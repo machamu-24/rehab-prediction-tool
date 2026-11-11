@@ -21,6 +21,8 @@ export const patientInputsSchema = z.object({
   admission_cba_score: measuredScore("admission_cba_score"), admission_care_level: measuredScore("admission_care_level"),
   admission_sit_up_independent: flag, admission_cognitive_impairment: flag, admission_spatial_neglect: flag,
   admission_fugl_meyer_lower: measuredScore("admission_fugl_meyer_lower"), admission_fac: measuredScore("admission_fac"),
+  admission_fact_score: measuredScore("admission_fact_score"), admission_tct_score: measuredScore("admission_tct_score"), admission_sias_nonparetic: measuredScore("admission_sias_nonparetic"),
+  admission_unilateral_impairment: flag, admission_independent_10m: flag,
   first_stroke: flag, unilateral_hemispheric_stroke: flag,
   prestroke_adl_independent: flag, supratentorial_stroke: flag, admission_wheelchair: flag, hemiparesis_present: flag,
   koyama_day_a: score(1, 100000), koyama_day_b: score(1, 100000), koyama_target_day: score(1, 100000),

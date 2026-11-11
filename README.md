@@ -4,6 +4,8 @@
 
 **Windows・Mac用の通常版配布:** [GitHub Releases](https://github.com/machamu-24/rehab-prediction-tool/releases) ／ [初回設定・起動手順](docs/RELEASE_GUIDE.md)。Node.js・MySQLの個別導入は不要です。実行環境とSQLite、最新文献を同梱し、新規利用は照合履歴0件から開始します。
 
+**v2.1.0:** 歩行関連4文献から7ルールを追加（同梱30ルール）。入院時FACT・TCT・非麻痺側SIASなどの入力に対応しました。[追加文献と登録内容](docs/STROKE_WALKING_2026_REVIEW.md)。
+
 脳卒中リハビリテーション領域の予後予測研究で報告されたカットオフ値、決定木、スコアリング、回帰式などを登録し、患者情報と文献ルールを照合するWebアプリケーションです。  
 現在の画面上では「予測」というより、入力条件に対して登録済み文献が何を支持するかを整理する「文献照合」ツールとして扱っています。
 

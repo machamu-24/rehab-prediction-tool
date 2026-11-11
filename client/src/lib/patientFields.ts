@@ -106,6 +106,11 @@ PATIENT_FIELDS.splice(1, 0, {
     { key: "prestroke_mrs", label: "今回の脳卒中発症前 mRS", type: "number", unit: "点", placeholder: "0〜5", description: "今回の脳卒中を発症する前の生活機能を、modified Rankin Scale（0〜5点）で入力します。" },
     { key: "admission_complication", label: "入院時 合併症の有無", type: "boolean", booleanLabels: { true: "あり（1）", false: "なし（0）" }, description: "Jeongらの式では入院時の合併症をあり＝1、なし＝0で扱います。原著では対象疾患・重症度の詳細な定義がなく、未確認の場合は「未評価」のままにします。" },
     { key: "admission_unassisted_5m", label: "入院時 人的介助なしでの5m歩行", type: "boolean", booleanLabels: { true: "可能", false: "不可能" } },
+    { key: "admission_fact_score", label: "入院時 FACT（体幹機能）", type: "number", unit: "点", placeholder: "0〜20", description: "Functional Assessment for Control of Trunkの10課題の合計です。TCTで代用しません。" },
+    { key: "admission_tct_score", label: "入院時 TCT（体幹コントロールテスト）", type: "number", unit: "点", placeholder: "0〜100", description: "回復期入院時のTCT合計です。現在の値・FACTで代用しません。" },
+    { key: "admission_sias_nonparetic", label: "入院時 SIAS非麻痺側機能（大腿四頭筋＋握力）", type: "number", unit: "点", placeholder: "0〜6", description: "非麻痺側大腿四頭筋筋力と握力の2項目合計です。麻痺側下肢SIAS（0〜15点）や膝伸展筋力Nm/kgとは別です。" },
+    { key: "admission_unilateral_impairment", label: "入院時に片側性の機能障害がある", type: "boolean", booleanLabels: { true: "片側性", false: "両側性・その他" }, description: "Jenkinらの対象条件です。画像上の病変側ではなく、入院時の機能障害が片側性かを確認します。" },
+    { key: "admission_independent_10m", label: "入院時 見守り・身体介助なしの10m歩行", type: "boolean", booleanLabels: { true: "自立", false: "非自立" }, description: "補助具・装具は使用可です。見守りや身体介助が必要なら非自立。Jenkinらは入院時非自立者を対象とします。" },
     { key: "admission_care_level", label: "入院時 要介護認定区分", type: "number", unit: "区分", placeholder: "0〜5（0=未申請・要支援）" },
   ],
 });

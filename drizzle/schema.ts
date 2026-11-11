@@ -356,6 +356,11 @@ export type PatientInputs = {
   stroke_type?: string;
   nihss?: number;
   tct_score?: number;
+  admission_fact_score?: number; // 入院時FACT合計（0〜20）
+  admission_tct_score?: number; // 入院時TCT合計（0〜100）
+  admission_sias_nonparetic?: number; // 非麻痺側大腿四頭筋＋握力（0〜6）
+  admission_unilateral_impairment?: boolean;
+  admission_independent_10m?: boolean;
   bbs_score?: number;
   motricity_index_lower?: number;
   walk_speed_10m?: number;

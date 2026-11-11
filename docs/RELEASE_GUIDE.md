@@ -1,4 +1,4 @@
-# RehabPredict 2.0：インストールと使い方
+# RehabPredict 2.1：インストールと使い方
 
 Windows・Mac用のデスクトップアプリです。**Node.js・MySQLのインストール、接続設定、管理者パスワードの入力は不要です。** 実行環境をアプリに同梱し、データはそのPCのSQLiteへ保存します。
 
@@ -8,9 +8,9 @@ Windows・Mac用のデスクトップアプリです。**Node.js・MySQLのイ�
 
 | PC | ファイル |
 | --- | --- |
-| Windows（Intel・AMDの64bit PC） | `RehabPredict-2.0.0-Windows-x64-Setup.exe` |
-| Apple Silicon Mac（M1・M2など） | `RehabPredict-2.0.0-macOS-arm64.dmg` |
-| Intel Mac | `RehabPredict-2.0.0-macOS-x64.dmg` |
+| Windows（Intel・AMDの64bit PC） | `RehabPredict-2.1.0-Windows-x64-Setup.exe` |
+| Apple Silicon Mac（M1・M2など） | `RehabPredict-2.1.0-macOS-arm64.dmg` |
+| Intel Mac | `RehabPredict-2.1.0-macOS-x64.dmg` |
 
 MacはAppleメニューの「このMacについて」でチップ／プロセッサを確認できます。macOS 13以降を対象にしています。WindowsはWindows 10以降の64bit環境を対象にしています。Windows ARM版は専用ビルドを提供していません。
 
@@ -31,7 +31,7 @@ DMGの中から使い続けず、Applicationsへコピーして利用してく�
 
 ## 初回起動と保存
 
-- 初期データは、2026-11-10に通常版の最新DBから書き出した **7アウトカム・23文献ルール** です。同じ研究の複数ルールを含む登録件数です。式・係数・適用条件・時間軸・URL・有効／無効状態を引き継ぎます。
+- 初期データは、既存の23ルールに2026-11-11の4文献・7ルールを追加した **7アウトカム・30文献ルール** です。同じ研究の複数ルールを含む登録件数です。式・係数・適用条件・時間軸・URL・有効／無効状態を引き継ぎます。
 - **新規利用は照合履歴・個別結果0件から開始します。** 症例入力・実績・メモ・利用者アカウント・バックアップ・接続情報は配布物に含みません。
 - 「照合して履歴に保存」を押すと記録します。「保存せず照合」は保存しません。入力途中の値は、必要に応じて下書きまたは履歴へ保存してから終了してください。
 - 終了はウィンドウを閉じるか、アプリのメニューから「終了」を選びます。保存済みの文献・症例・履歴は次回も利用できます。

@@ -1,9 +1,9 @@
 {
-  "checksum": "64743af49b74e32e15d8012f9d34c962449358afa7f443d77eb51b2be8f13b33",
+  "checksum": "e4a92d6d760a3e582522b9db77036bf4df6bef38c7bb2ae091fafa83ed4e451e",
   "payload": {
     "format": "rehab-literature-seed",
     "version": 1,
-    "exportedAt": "2026-11-10T10:35:36.573Z",
+    "exportedAt": "2026-11-11T10:39:25.781Z",
     "tables": {
       "outcomes": [
         {
@@ -2924,6 +2924,837 @@
           "sortOrder": 48,
           "createdAt": "2026-10-30 11:43:20",
           "updatedAt": "2026-10-30 11:43:20"
+        },
+        {
+          "id": 60019,
+          "outcomeId": 1,
+          "name": "入院時BBSによる退院時10m歩行自立（≥14点、Jenkinら2021）",
+          "ruleType": "cutoff",
+          "source": "Jenkin J, Parkinson S, Jacques A, Kho L, Hill K. (2021) Berg Balance Scale Score as a Predictor of Independent Walking at Discharge among Adult Stroke Survivors. Physiother Can 73(3):252–256. doi:10.3138/ptc-2019-0090",
+          "sourceUrl": "https://doi.org/10.3138/ptc-2019-0090",
+          "evidenceLevel": "Cohort Study",
+          "applyConditions": [
+            {
+              "field": "admission_ward_type",
+              "operator": "equals",
+              "value": "回復期リハビリテーション病棟",
+              "label": "入院リハビリテーション開始時の評価"
+            },
+            {
+              "field": "stroke_type",
+              "operator": "in",
+              "value": [
+                "脳梗塞",
+                "脳出血"
+              ],
+              "label": "研究対象：脳梗塞・脳内出血"
+            },
+            {
+              "field": "admission_age",
+              "operator": ">=",
+              "value": 18,
+              "label": "成人"
+            },
+            {
+              "field": "admission_unilateral_impairment",
+              "operator": "boolean",
+              "value": true,
+              "label": "入院時に片側性の機能障害あり"
+            },
+            {
+              "field": "admission_independent_10m",
+              "operator": "boolean_negative",
+              "value": false,
+              "label": "入院時は見守り・身体介助なしの10m歩行が非自立"
+            }
+          ],
+          "ruleDefinition": {
+            "type": "cutoff",
+            "inputTimepoint": "admission",
+            "field": "admission_bbs_score",
+            "fieldLabel": "入院時BBS",
+            "unit": "点",
+            "operator": ">=",
+            "threshold": 14,
+            "description": "入院時に歩行非自立だった成人脳卒中患者で、入院時BBSから退院時の見守り・身体介助なし10m歩行を検討。補助具・装具の使用は可。",
+            "positiveMessage": "入院時BBS≥14点：退院時の見守り・身体介助なし10m歩行自立を支持します（補助具・装具は使用可）。",
+            "negativeMessage": "入院時BBS<14点：退院時10m歩行自立を支持するカットオフ未満です。歩行自立の獲得不能を意味しません。",
+            "notes": "対象：豪州Royal Perth Rehabilitation Hospitalの成人脳卒中患者68名（片側性障害、入院時歩行非自立）。2012年6月〜2014年1月、入院2日以内に評価。年齢中央値57歳、発症から入院中央値14日（IQR16）、在院中央値8週（IQR10）。退院時アウトカムは見守り・身体介助なしで10m以上歩行（補助具・装具可）であり、FIM歩行≥6やFAC≥4と同じ評価尺度ではない。BBS≥14点、AUC0.81（95%CI0.71–0.92）、感度0.73、特異度0.89。カットオフの95%CIは9–21点。単施設・少数例、独立した外部検証なし。BBSのOR1.23だけから個人確率を作らず、切片未掲載の回帰モデルは登録しない。",
+            "timeline": {
+              "version": 1,
+              "anchor": "stroke_onset",
+              "kind": "future",
+              "evaluation": {
+                "value": 14,
+                "unit": "day",
+                "precision": "median",
+                "originalText": "Within 2 days of rehabilitation admission; median 14 days from stroke onset",
+                "basis": "Methods p.253、Table 1 p.254。集団の中央値を個人の評価日・適用範囲へ変換しない。"
+              },
+              "target": {
+                "value": null,
+                "unit": "day",
+                "precision": "unknown",
+                "originalText": "At discharge from inpatient rehabilitation",
+                "basis": "退院時。個人ごとに異なるため固定日・適用日数範囲を設定しない。"
+              }
+            },
+            "evidenceReview": {
+              "status": "checked",
+              "sourceUrl": "https://doi.org/10.3138/ptc-2019-0090",
+              "location": "Methods p.253、Table 1・Results p.254、Figure 1 p.255",
+              "reason": "BBS≥14、対象の入院時非自立、10m歩行の定義およびROC指標を確認。",
+              "reviewedAt": "2026-11-11",
+              "revision": "stroke-walking-primary-source-2026-11-11-v1"
+            },
+            "study": {
+              "year": 2021,
+              "doi": "10.3138/ptc-2019-0090",
+              "sampleSize": 68,
+              "outcome": "independent_10m_without_supervision_or_physical_assistance",
+              "validation": "single_center_derivation_only"
+            }
+          },
+          "accuracy": null,
+          "sensitivity": 0.73,
+          "specificity": 0.89,
+          "auc": 0.81,
+          "consensusEligible": 1,
+          "isActive": 1,
+          "sortOrder": 49,
+          "createdAt": "2026-11-11T10:39:21.433Z",
+          "updatedAt": "2026-11-11T10:39:21.433Z"
+        },
+        {
+          "id": 60020,
+          "outcomeId": 1,
+          "name": "入院時BBSによる退院時歩行自立・全体・参考（≥24点、Kimら2026）",
+          "ruleType": "cutoff",
+          "source": "Kim JS, Hwang IG, Ko EJ. (2026) Subtype-specific optimal cut-off values of the Berg Balance Scale for predicting independent walking in inpatient stroke rehabilitation: a multicentre cohort study. J Rehabil Med 58:45663. doi:10.2340/jrm.v58.45663",
+          "sourceUrl": "https://doi.org/10.2340/jrm.v58.45663",
+          "evidenceLevel": "Cohort Study",
+          "applyConditions": [
+            {
+              "field": "admission_ward_type",
+              "operator": "in",
+              "value": [
+                "急性期病棟",
+                "回復期リハビリテーション病棟"
+              ],
+              "label": "急性期・亜急性期の入院リハビリ集団"
+            },
+            {
+              "field": "stroke_type",
+              "operator": "in",
+              "value": [
+                "脳梗塞",
+                "脳出血"
+              ],
+              "label": "研究対象：脳梗塞・脳内出血"
+            }
+          ],
+          "ruleDefinition": {
+            "type": "cutoff",
+            "inputTimepoint": "admission",
+            "field": "admission_bbs_score",
+            "fieldLabel": "入院時BBS",
+            "unit": "点",
+            "operator": ">=",
+            "threshold": 24,
+            "description": "入院時BBSで退院時FAC≥4を検討する全体集団の参考カットオフ。急性期・亜急性期の混合集団。",
+            "positiveMessage": "入院時BBS≥24点（全体・参考）：退院時FAC≥4の平地歩行自立を支持します。全体集団の参考結果で、病型別ルールとの重複集計はしません。",
+            "negativeMessage": "入院時BBS<24点（全体・参考）：退院時FAC≥4を支持するカットオフ未満です。獲得不能を意味しません。",
+            "notes": "対象：韓国3施設の入院脳卒中リハビリ患者565名（脳梗塞316名、脳出血249名）。急性期大学病院317名と亜急性期リハ病院248名の混合集団。発症から入院中央値42日（IQR23–73）、在院中央値74日（IQR44–186）。入院時BBSから退院時FAC≥4（補助具使用可の平地歩行自立）を検討。入院時FAC0–5を含み、非歩行者だけの新規自立獲得モデルではない。全体：BBS≥24、AUC0.899、感度90.7%、特異度74.4%。脳梗塞：BBS≥33、AUC0.890、感度84.1%、特異度77.0%。脳出血：BBS≥12、AUC0.912、感度96.3%、特異度75.6%。Table IIIの33点行の感度79.0%・特異度83.2%は全体集団の指標で、脳梗塞サブグループには転用しない。病型との交互作用は非有意（p=0.756）。急性期10点・亜急性期38点という探索的閾値は施設と病期が交絡し未検証のため登録しない。内部bootstrapのみ、外部検証なし。多い欠測による選択バイアスと日本の回復期との患者背景・在院期間の違いに注意。同一研究の全体ルールと病型別ルールを重複集計しない。",
+            "timeline": {
+              "version": 1,
+              "anchor": "stroke_onset",
+              "kind": "future",
+              "evaluation": {
+                "value": 42,
+                "unit": "day",
+                "precision": "median",
+                "originalText": "BBS on rehabilitation admission; median 42 days (IQR 23–73) from onset",
+                "basis": "Table I。全体の代表値であり、病型別の中央値や適用日数範囲ではない。"
+              },
+              "target": {
+                "value": null,
+                "unit": "day",
+                "precision": "unknown",
+                "originalText": "At discharge from inpatient rehabilitation",
+                "basis": "退院時。個人ごとに異なるため固定日・適用日数範囲を設定しない。"
+              }
+            },
+            "evidenceReview": {
+              "status": "checked",
+              "sourceUrl": "https://doi.org/10.2340/jrm.v58.45663",
+              "location": "Methods pp.2–4、Results・Table II p.5、Table III・Subgroup analyses p.6、Limitations p.9",
+              "reason": "病型別ROC値を全体Table IIIの値と区別。全体ルールは参考集計、病型別2ルールは相互排他的に適用。",
+              "reviewedAt": "2026-11-11",
+              "revision": "stroke-walking-primary-source-2026-11-11-v1"
+            },
+            "study": {
+              "year": 2026,
+              "doi": "10.2340/jrm.v58.45663",
+              "cohortGroup": "kim-2026-565",
+              "sampleSize": 565,
+              "totalSampleSize": 565,
+              "subtype": null,
+              "outcome": "discharge_FAC_ge_4",
+              "validation": "bootstrap_internal_only",
+              "consensusReason": "病型別モデルとの重複を避けるため全体モデルは参考結果。"
+            }
+          },
+          "accuracy": null,
+          "sensitivity": 0.907,
+          "specificity": 0.744,
+          "auc": 0.899,
+          "consensusEligible": 0,
+          "isActive": 1,
+          "sortOrder": 50,
+          "createdAt": "2026-11-11T10:39:21.436Z",
+          "updatedAt": "2026-11-11T10:39:21.436Z"
+        },
+        {
+          "id": 60021,
+          "outcomeId": 1,
+          "name": "入院時BBSによる退院時歩行自立・脳梗塞（≥33点、Kimら2026）",
+          "ruleType": "cutoff",
+          "source": "Kim JS, Hwang IG, Ko EJ. (2026) Subtype-specific optimal cut-off values of the Berg Balance Scale for predicting independent walking in inpatient stroke rehabilitation: a multicentre cohort study. J Rehabil Med 58:45663. doi:10.2340/jrm.v58.45663",
+          "sourceUrl": "https://doi.org/10.2340/jrm.v58.45663",
+          "evidenceLevel": "Cohort Study",
+          "applyConditions": [
+            {
+              "field": "admission_ward_type",
+              "operator": "in",
+              "value": [
+                "急性期病棟",
+                "回復期リハビリテーション病棟"
+              ],
+              "label": "急性期・亜急性期の入院リハビリ集団"
+            },
+            {
+              "field": "stroke_type",
+              "operator": "equals",
+              "value": "脳梗塞",
+              "label": "病型別モデル：脳梗塞"
+            }
+          ],
+          "ruleDefinition": {
+            "type": "cutoff",
+            "inputTimepoint": "admission",
+            "field": "admission_bbs_score",
+            "fieldLabel": "入院時BBS",
+            "unit": "点",
+            "operator": ">=",
+            "threshold": 33,
+            "description": "入院時BBSで退院時FAC≥4を検討する脳梗塞の病型別カットオフ。急性期・亜急性期の混合集団。",
+            "positiveMessage": "入院時BBS≥33点（脳梗塞）：退院時FAC≥4の平地歩行自立を支持します。",
+            "negativeMessage": "入院時BBS<33点（脳梗塞）：退院時FAC≥4を支持するカットオフ未満です。獲得不能を意味しません。",
+            "notes": "対象：韓国3施設の入院脳卒中リハビリ患者565名（脳梗塞316名、脳出血249名）。急性期大学病院317名と亜急性期リハ病院248名の混合集団。発症から入院中央値42日（IQR23–73）、在院中央値74日（IQR44–186）。入院時BBSから退院時FAC≥4（補助具使用可の平地歩行自立）を検討。入院時FAC0–5を含み、非歩行者だけの新規自立獲得モデルではない。全体：BBS≥24、AUC0.899、感度90.7%、特異度74.4%。脳梗塞：BBS≥33、AUC0.890、感度84.1%、特異度77.0%。脳出血：BBS≥12、AUC0.912、感度96.3%、特異度75.6%。Table IIIの33点行の感度79.0%・特異度83.2%は全体集団の指標で、脳梗塞サブグループには転用しない。病型との交互作用は非有意（p=0.756）。急性期10点・亜急性期38点という探索的閾値は施設と病期が交絡し未検証のため登録しない。内部bootstrapのみ、外部検証なし。多い欠測による選択バイアスと日本の回復期との患者背景・在院期間の違いに注意。同一研究の全体ルールと病型別ルールを重複集計しない。",
+            "timeline": {
+              "version": 1,
+              "anchor": "stroke_onset",
+              "kind": "future",
+              "evaluation": {
+                "value": 42,
+                "unit": "day",
+                "precision": "median",
+                "originalText": "BBS on rehabilitation admission; median 42 days (IQR 23–73) from onset",
+                "basis": "Table I。全体の代表値であり、病型別の中央値や適用日数範囲ではない。"
+              },
+              "target": {
+                "value": null,
+                "unit": "day",
+                "precision": "unknown",
+                "originalText": "At discharge from inpatient rehabilitation",
+                "basis": "退院時。個人ごとに異なるため固定日・適用日数範囲を設定しない。"
+              }
+            },
+            "evidenceReview": {
+              "status": "checked",
+              "sourceUrl": "https://doi.org/10.2340/jrm.v58.45663",
+              "location": "Methods pp.2–4、Results・Table II p.5、Table III・Subgroup analyses p.6、Limitations p.9",
+              "reason": "病型別ROC値を全体Table IIIの値と区別。全体ルールは参考集計、病型別2ルールは相互排他的に適用。",
+              "reviewedAt": "2026-11-11",
+              "revision": "stroke-walking-primary-source-2026-11-11-v1"
+            },
+            "study": {
+              "year": 2026,
+              "doi": "10.2340/jrm.v58.45663",
+              "cohortGroup": "kim-2026-565",
+              "sampleSize": 316,
+              "totalSampleSize": 565,
+              "subtype": "脳梗塞",
+              "outcome": "discharge_FAC_ge_4",
+              "validation": "bootstrap_internal_only",
+              "consensusReason": "同一患者には対応する病型別ルール1件のみ集計。全体ルールは集計外。"
+            }
+          },
+          "accuracy": null,
+          "sensitivity": 0.841,
+          "specificity": 0.77,
+          "auc": 0.89,
+          "consensusEligible": 1,
+          "isActive": 1,
+          "sortOrder": 51,
+          "createdAt": "2026-11-11T10:39:21.437Z",
+          "updatedAt": "2026-11-11T10:39:21.437Z"
+        },
+        {
+          "id": 60022,
+          "outcomeId": 1,
+          "name": "入院時BBSによる退院時歩行自立・脳出血（≥12点、Kimら2026）",
+          "ruleType": "cutoff",
+          "source": "Kim JS, Hwang IG, Ko EJ. (2026) Subtype-specific optimal cut-off values of the Berg Balance Scale for predicting independent walking in inpatient stroke rehabilitation: a multicentre cohort study. J Rehabil Med 58:45663. doi:10.2340/jrm.v58.45663",
+          "sourceUrl": "https://doi.org/10.2340/jrm.v58.45663",
+          "evidenceLevel": "Cohort Study",
+          "applyConditions": [
+            {
+              "field": "admission_ward_type",
+              "operator": "in",
+              "value": [
+                "急性期病棟",
+                "回復期リハビリテーション病棟"
+              ],
+              "label": "急性期・亜急性期の入院リハビリ集団"
+            },
+            {
+              "field": "stroke_type",
+              "operator": "equals",
+              "value": "脳出血",
+              "label": "病型別モデル：脳出血"
+            }
+          ],
+          "ruleDefinition": {
+            "type": "cutoff",
+            "inputTimepoint": "admission",
+            "field": "admission_bbs_score",
+            "fieldLabel": "入院時BBS",
+            "unit": "点",
+            "operator": ">=",
+            "threshold": 12,
+            "description": "入院時BBSで退院時FAC≥4を検討する脳出血の病型別カットオフ。急性期・亜急性期の混合集団。",
+            "positiveMessage": "入院時BBS≥12点（脳出血）：退院時FAC≥4の平地歩行自立を支持します。",
+            "negativeMessage": "入院時BBS<12点（脳出血）：退院時FAC≥4を支持するカットオフ未満です。獲得不能を意味しません。",
+            "notes": "対象：韓国3施設の入院脳卒中リハビリ患者565名（脳梗塞316名、脳出血249名）。急性期大学病院317名と亜急性期リハ病院248名の混合集団。発症から入院中央値42日（IQR23–73）、在院中央値74日（IQR44–186）。入院時BBSから退院時FAC≥4（補助具使用可の平地歩行自立）を検討。入院時FAC0–5を含み、非歩行者だけの新規自立獲得モデルではない。全体：BBS≥24、AUC0.899、感度90.7%、特異度74.4%。脳梗塞：BBS≥33、AUC0.890、感度84.1%、特異度77.0%。脳出血：BBS≥12、AUC0.912、感度96.3%、特異度75.6%。Table IIIの33点行の感度79.0%・特異度83.2%は全体集団の指標で、脳梗塞サブグループには転用しない。病型との交互作用は非有意（p=0.756）。急性期10点・亜急性期38点という探索的閾値は施設と病期が交絡し未検証のため登録しない。内部bootstrapのみ、外部検証なし。多い欠測による選択バイアスと日本の回復期との患者背景・在院期間の違いに注意。同一研究の全体ルールと病型別ルールを重複集計しない。",
+            "timeline": {
+              "version": 1,
+              "anchor": "stroke_onset",
+              "kind": "future",
+              "evaluation": {
+                "value": 42,
+                "unit": "day",
+                "precision": "median",
+                "originalText": "BBS on rehabilitation admission; median 42 days (IQR 23–73) from onset",
+                "basis": "Table I。全体の代表値であり、病型別の中央値や適用日数範囲ではない。"
+              },
+              "target": {
+                "value": null,
+                "unit": "day",
+                "precision": "unknown",
+                "originalText": "At discharge from inpatient rehabilitation",
+                "basis": "退院時。個人ごとに異なるため固定日・適用日数範囲を設定しない。"
+              }
+            },
+            "evidenceReview": {
+              "status": "checked",
+              "sourceUrl": "https://doi.org/10.2340/jrm.v58.45663",
+              "location": "Methods pp.2–4、Results・Table II p.5、Table III・Subgroup analyses p.6、Limitations p.9",
+              "reason": "病型別ROC値を全体Table IIIの値と区別。全体ルールは参考集計、病型別2ルールは相互排他的に適用。",
+              "reviewedAt": "2026-11-11",
+              "revision": "stroke-walking-primary-source-2026-11-11-v1"
+            },
+            "study": {
+              "year": 2026,
+              "doi": "10.2340/jrm.v58.45663",
+              "cohortGroup": "kim-2026-565",
+              "sampleSize": 249,
+              "totalSampleSize": 565,
+              "subtype": "脳出血",
+              "outcome": "discharge_FAC_ge_4",
+              "validation": "bootstrap_internal_only",
+              "consensusReason": "同一患者には対応する病型別ルール1件のみ集計。全体ルールは集計外。"
+            }
+          },
+          "accuracy": null,
+          "sensitivity": 0.963,
+          "specificity": 0.756,
+          "auc": 0.912,
+          "consensusEligible": 1,
+          "isActive": 1,
+          "sortOrder": 52,
+          "createdAt": "2026-11-11T10:39:21.437Z",
+          "updatedAt": "2026-11-11T10:39:21.437Z"
+        },
+        {
+          "id": 60023,
+          "outcomeId": 1,
+          "name": "入院時FACTによる退院時歩行自立（≥8点、Sato・Ogawaら2025）",
+          "ruleType": "cutoff",
+          "source": "Sato K, Ogawa T. (2025) Functional Assessment for Control of the Trunk Predicts Independent Walking in Patients with Stroke. JMA J 8(1):226–233. doi:10.31662/jmaj.2024-0212",
+          "sourceUrl": "https://doi.org/10.31662/jmaj.2024-0212",
+          "evidenceLevel": "Cohort Study",
+          "applyConditions": [
+            {
+              "field": "admission_ward_type",
+              "operator": "equals",
+              "value": "回復期リハビリテーション病棟",
+              "label": "入院リハビリテーション開始時の評価"
+            },
+            {
+              "field": "stroke_type",
+              "operator": "equals",
+              "value": "脳梗塞",
+              "label": "原著の対象は脳梗塞のみ"
+            }
+          ],
+          "ruleDefinition": {
+            "type": "cutoff",
+            "inputTimepoint": "admission",
+            "field": "admission_fact_score",
+            "fieldLabel": "入院時FACT（体幹機能）",
+            "unit": "点",
+            "operator": ">=",
+            "threshold": 8,
+            "description": "脳梗塞患者の入院時FACT（0〜20点）から退院時FIM歩行≥6を検討。脳出血への適用はしない。",
+            "positiveMessage": "入院時FACT≥8点：退院時FIM歩行≥6の歩行自立を支持します。",
+            "negativeMessage": "入院時FACT<8点：退院時歩行自立を支持するカットオフ未満です。自立獲得不能を意味しません。",
+            "notes": "対象：日本の中山病院に2018年6月〜2021年10月に入院した脳梗塞患者213名（歩行自立102名、非自立111名）。欠測138名・在院14日未満12名を除外。脳出血を含めず、在院14日未満への一般化には注意。FACTは10課題、0〜20点でTCTとは別尺度。入院時FACT≥8（考察・結論に等号明記）、AUC0.82（95%CI0.77–0.88）、感度93%、特異度59%。アウトカムは抄録・Table 4のFIM歩行≥6／≤5を採用。Methodsの>6、Resultsの非自立<5は抄録・表と不一致で、その表記差を保持する。ROC閾値は213名で得た値であり、PSM後84名の45.2%対11.9%は個人の予測確率ではない。単施設後ろ向き研究、外部検証なし。回帰分析のORを組み合わせた確率計算は切片が未掲載のため行わない。",
+            "timeline": {
+              "version": 1,
+              "anchor": "stroke_onset",
+              "kind": "future",
+              "evaluation": {
+                "value": null,
+                "unit": "day",
+                "precision": "unknown",
+                "originalText": "On admission to rehabilitation hospital",
+                "basis": "Table 1には自立群16日・非自立群20日の中央値があるが全体の中央値は未掲載。群別中央値から全体値を作らない。"
+              },
+              "target": {
+                "value": null,
+                "unit": "day",
+                "precision": "unknown",
+                "originalText": "At discharge from inpatient rehabilitation",
+                "basis": "退院時。個人ごとに異なるため固定日・適用日数範囲を設定しない。"
+              }
+            },
+            "evidenceReview": {
+              "status": "checked",
+              "sourceUrl": "https://doi.org/10.31662/jmaj.2024-0212",
+              "location": "Abstract p.226、Methods p.227、Results p.229、Figure 2 p.231、Table 4・Discussion p.232、Conclusion p.233",
+              "reason": "FACT≥8とROC性能を確認。FIM歩行の不等号の本文内不一致を注記し、抄録・表の≥6を採用。",
+              "reviewedAt": "2026-11-11",
+              "revision": "stroke-walking-primary-source-2026-11-11-v1"
+            },
+            "study": {
+              "year": 2025,
+              "doi": "10.31662/jmaj.2024-0212",
+              "sampleSize": 213,
+              "outcome": "discharge_FIM_walking_ge_6",
+              "validation": "single_center_retrospective_no_external_validation",
+              "outcomeNotationDiscrepancy": true
+            }
+          },
+          "accuracy": null,
+          "sensitivity": 0.93,
+          "specificity": 0.59,
+          "auc": 0.82,
+          "consensusEligible": 1,
+          "isActive": 1,
+          "sortOrder": 53,
+          "createdAt": "2026-11-11T10:39:21.437Z",
+          "updatedAt": "2026-11-11T10:39:21.437Z"
+        },
+        {
+          "id": 60024,
+          "outcomeId": 1,
+          "name": "入院時運動FIM・非麻痺側SIAS・FACTの決定木（Murakamiら2026）",
+          "ruleType": "decision_tree",
+          "source": "Murakami M, Sato R, Ogasawara K, Kimura Y. (2026) Prediction Models for Gait Independence in Patients with Post-Stroke Hemiplegia in a Convalescent Rehabilitation Ward: Comparison of Predictive Performance Between Different Trunk Function Assessments. Jpn J Compr Rehabil Sci 17:24–32. doi:10.11336/jjcrs.17.24",
+          "sourceUrl": "https://doi.org/10.11336/jjcrs.17.24",
+          "evidenceLevel": "Cohort Study",
+          "applyConditions": [
+            {
+              "field": "admission_ward_type",
+              "operator": "equals",
+              "value": "回復期リハビリテーション病棟",
+              "label": "入院リハビリテーション開始時の評価"
+            },
+            {
+              "field": "stroke_type",
+              "operator": "in",
+              "value": [
+                "脳梗塞",
+                "脳出血"
+              ],
+              "label": "研究対象：脳梗塞・脳内出血"
+            },
+            {
+              "field": "hemiparesis_present",
+              "operator": "boolean",
+              "value": true,
+              "label": "脳卒中による片麻痺あり"
+            }
+          ],
+          "ruleDefinition": {
+            "type": "decision_tree",
+            "outputMode": "binary",
+            "inputTimepoint": "admission",
+            "description": "入院時の運動FIM・非麻痺側SIAS機能・FACTから退院時FIM歩行≥6を検討する決定木。同一研究の代替モデルのため参考結果として表示。",
+            "nodes": [
+              {
+                "id": "root",
+                "field": "admission_fim_motor_total",
+                "fieldLabel": "入院時運動FIM",
+                "operator": "<=",
+                "threshold": 19,
+                "trueNodeId": "low",
+                "falseNodeId": "motor30"
+              },
+              {
+                "id": "motor30",
+                "field": "admission_fim_motor_total",
+                "fieldLabel": "入院時運動FIM",
+                "operator": "<=",
+                "threshold": 30,
+                "trueNodeId": "sias",
+                "falseNodeId": "motor50"
+              },
+              {
+                "id": "motor50",
+                "field": "admission_fim_motor_total",
+                "fieldLabel": "入院時運動FIM",
+                "operator": "<=",
+                "threshold": 50,
+                "trueNodeId": "trunk",
+                "falseNodeId": "high"
+              },
+              {
+                "id": "sias",
+                "field": "admission_sias_nonparetic",
+                "fieldLabel": "入院時SIAS非麻痺側（大腿四頭筋＋握力）",
+                "operator": "<=",
+                "threshold": 3,
+                "trueNodeId": "siasLow",
+                "falseNodeId": "siasHigh"
+              },
+              {
+                "id": "trunk",
+                "field": "admission_fact_score",
+                "fieldLabel": "入院時FACT",
+                "operator": "<=",
+                "threshold": 11,
+                "trueNodeId": "trunkLow",
+                "falseNodeId": "trunkHigh"
+              },
+              {
+                "id": "low",
+                "field": "",
+                "fieldLabel": "",
+                "operator": "boolean",
+                "isLeaf": true,
+                "isPositive": false,
+                "probability": 0,
+                "message": "運動FIM≤19：研究内の歩行自立者0/99名（0.0%）。原著の分類は歩行非自立。患者個人の予測確率や獲得不能の判定ではありません。"
+              },
+              {
+                "id": "high",
+                "field": "",
+                "fieldLabel": "",
+                "operator": "boolean",
+                "isLeaf": true,
+                "isPositive": true,
+                "probability": 0.9473684210526315,
+                "message": "運動FIM≥51：研究内の歩行自立者18/19名（94.7%）。原著の分類は歩行自立。患者個人の予測確率や獲得不能の判定ではありません。"
+              },
+              {
+                "id": "siasLow",
+                "field": "",
+                "fieldLabel": "",
+                "operator": "boolean",
+                "isLeaf": true,
+                "isPositive": false,
+                "probability": 0,
+                "message": "運動FIM20〜30・非麻痺側SIAS≤3：研究内の歩行自立者0/25名（0.0%）。原著の分類は歩行非自立。患者個人の予測確率や獲得不能の判定ではありません。"
+              },
+              {
+                "id": "siasHigh",
+                "field": "",
+                "fieldLabel": "",
+                "operator": "boolean",
+                "isLeaf": true,
+                "isPositive": false,
+                "probability": 0.5,
+                "message": "運動FIM20〜30・非麻痺側SIAS≥4：研究内の歩行自立者7/14名（50.0%）。自立・非自立が同数のため、原著の規則では非自立に分類。患者個人の予測確率や獲得不能の判定ではありません。"
+              },
+              {
+                "id": "trunkLow",
+                "field": "",
+                "fieldLabel": "",
+                "operator": "boolean",
+                "isLeaf": true,
+                "isPositive": false,
+                "probability": 0.26666666666666666,
+                "message": "運動FIM31〜50・FACT≤11：研究内の歩行自立者4/15名（26.7%）。原著の分類は歩行非自立。患者個人の予測確率や獲得不能の判定ではありません。"
+              },
+              {
+                "id": "trunkHigh",
+                "field": "",
+                "fieldLabel": "",
+                "operator": "boolean",
+                "isLeaf": true,
+                "isPositive": true,
+                "probability": 0.75,
+                "message": "運動FIM31〜50・FACT≥12：研究内の歩行自立者18/24名（75.0%）。原著の分類は歩行自立。患者個人の予測確率や獲得不能の判定ではありません。"
+              }
+            ],
+            "notes": "対象：西堀病院の回復期リハビリテーション病棟に2020年10月〜2024年3月に入棟した脳卒中片麻痺患者196名（男性102、女性94、平均77.7歳）。脳梗塞・脳内出血、必要な評価が可能で退院までリハを継続した患者。意識障害・重い高次脳機能障害で評価困難、急変・死亡・転院、欠測を除外。入棟1週以内の評価から退院時FIM歩行≥6を検討。発症から入棟平均36.7日、在院平均120.9日。運動FIMを≤19／20〜30／31〜50／≥51の4群に分け、20〜30では非麻痺側SIAS≥4、31〜50ではFACT≥12またはTCT≥88で分岐する。非麻痺側SIASは大腿四頭筋筋力と握力の合計（0〜6）で、麻痺側下肢SIAS（0〜15）や膝伸展筋力Nm/kgで代用しない。終端は多数決、同数は非自立とする原著の規則を保持。0/99や0/25という研究内頻度を将来の歩行自立確率0%に変換しない。FACT版・TCT版は同一196名の代替モデルであり、いずれも有効な参考結果として照合するが、支持／困難の集計には加えない。単施設後ろ向き・10分割内部交差検証のみ、外部検証なし。FACT版：学習データ正解率90.8%、10分割交差検証正解率84.7%。群別正解率（自立76.6%・非自立95.3%）は学習データであり、交差検証の感度・特異度として登録しない。抄録のAUC0.968（FACT）・0.971（TCT）は補助解析のロジスティック回帰の値で、決定木のAUCではない。回帰の切片未掲載につき確率計算モデルは作らない。",
+            "timeline": {
+              "version": 1,
+              "anchor": "stroke_onset",
+              "kind": "future",
+              "evaluation": {
+                "value": 36.7,
+                "unit": "day",
+                "precision": "mean",
+                "originalText": "Within one week of admission; mean 36.7 days from onset to admission",
+                "basis": "Methods p.25、Results p.26。入棟時平均であり、1週の評価窓を発症起点の固定範囲には変換しない。"
+              },
+              "target": {
+                "value": null,
+                "unit": "day",
+                "precision": "unknown",
+                "originalText": "At discharge from inpatient rehabilitation",
+                "basis": "退院時。個人ごとに異なるため固定日・適用日数範囲を設定しない。"
+              }
+            },
+            "evidenceReview": {
+              "status": "checked",
+              "sourceUrl": "https://doi.org/10.11336/jjcrs.17.24",
+              "location": "Methods pp.25–26、Figure 1 p.27、Results pp.26–28、Limitations p.31",
+              "reason": "図の全6終端と境界・人数を目視照合。同数の非自立分類を保持し、回帰AUCを決定木へ転用しない。",
+              "reviewedAt": "2026-11-11",
+              "revision": "stroke-walking-primary-source-2026-11-11-v1"
+            },
+            "study": {
+              "year": 2026,
+              "doi": "10.11336/jjcrs.17.24",
+              "cohortGroup": "murakami-2026-196",
+              "sampleSize": 196,
+              "model": "FACT",
+              "outcome": "discharge_FIM_walking_ge_6",
+              "validation": "ten_fold_internal_cross_validation",
+              "resubstitutionAccuracy": 0.908,
+              "crossValidatedAccuracy": 0.847,
+              "supplementaryLogisticAUC": 0.968,
+              "consensusReason": "同一集団の代替モデル2件を独立した文献2票として加算しないため参考結果。"
+            }
+          },
+          "accuracy": 0.847,
+          "sensitivity": null,
+          "specificity": null,
+          "auc": null,
+          "consensusEligible": 0,
+          "isActive": 1,
+          "sortOrder": 54,
+          "createdAt": "2026-11-11T10:39:21.437Z",
+          "updatedAt": "2026-11-11T10:39:21.437Z"
+        },
+        {
+          "id": 60025,
+          "outcomeId": 1,
+          "name": "入院時運動FIM・非麻痺側SIAS・TCTの決定木（Murakamiら2026）",
+          "ruleType": "decision_tree",
+          "source": "Murakami M, Sato R, Ogasawara K, Kimura Y. (2026) Prediction Models for Gait Independence in Patients with Post-Stroke Hemiplegia in a Convalescent Rehabilitation Ward: Comparison of Predictive Performance Between Different Trunk Function Assessments. Jpn J Compr Rehabil Sci 17:24–32. doi:10.11336/jjcrs.17.24",
+          "sourceUrl": "https://doi.org/10.11336/jjcrs.17.24",
+          "evidenceLevel": "Cohort Study",
+          "applyConditions": [
+            {
+              "field": "admission_ward_type",
+              "operator": "equals",
+              "value": "回復期リハビリテーション病棟",
+              "label": "入院リハビリテーション開始時の評価"
+            },
+            {
+              "field": "stroke_type",
+              "operator": "in",
+              "value": [
+                "脳梗塞",
+                "脳出血"
+              ],
+              "label": "研究対象：脳梗塞・脳内出血"
+            },
+            {
+              "field": "hemiparesis_present",
+              "operator": "boolean",
+              "value": true,
+              "label": "脳卒中による片麻痺あり"
+            }
+          ],
+          "ruleDefinition": {
+            "type": "decision_tree",
+            "outputMode": "binary",
+            "inputTimepoint": "admission",
+            "description": "入院時の運動FIM・非麻痺側SIAS機能・TCTから退院時FIM歩行≥6を検討する決定木。同一研究の代替モデルのため参考結果として表示。",
+            "nodes": [
+              {
+                "id": "root",
+                "field": "admission_fim_motor_total",
+                "fieldLabel": "入院時運動FIM",
+                "operator": "<=",
+                "threshold": 19,
+                "trueNodeId": "low",
+                "falseNodeId": "motor30"
+              },
+              {
+                "id": "motor30",
+                "field": "admission_fim_motor_total",
+                "fieldLabel": "入院時運動FIM",
+                "operator": "<=",
+                "threshold": 30,
+                "trueNodeId": "sias",
+                "falseNodeId": "motor50"
+              },
+              {
+                "id": "motor50",
+                "field": "admission_fim_motor_total",
+                "fieldLabel": "入院時運動FIM",
+                "operator": "<=",
+                "threshold": 50,
+                "trueNodeId": "trunk",
+                "falseNodeId": "high"
+              },
+              {
+                "id": "sias",
+                "field": "admission_sias_nonparetic",
+                "fieldLabel": "入院時SIAS非麻痺側（大腿四頭筋＋握力）",
+                "operator": "<=",
+                "threshold": 3,
+                "trueNodeId": "siasLow",
+                "falseNodeId": "siasHigh"
+              },
+              {
+                "id": "trunk",
+                "field": "admission_tct_score",
+                "fieldLabel": "入院時TCT",
+                "operator": "<=",
+                "threshold": 87,
+                "trueNodeId": "trunkLow",
+                "falseNodeId": "trunkHigh"
+              },
+              {
+                "id": "low",
+                "field": "",
+                "fieldLabel": "",
+                "operator": "boolean",
+                "isLeaf": true,
+                "isPositive": false,
+                "probability": 0,
+                "message": "運動FIM≤19：研究内の歩行自立者0/99名（0.0%）。原著の分類は歩行非自立。患者個人の予測確率や獲得不能の判定ではありません。"
+              },
+              {
+                "id": "high",
+                "field": "",
+                "fieldLabel": "",
+                "operator": "boolean",
+                "isLeaf": true,
+                "isPositive": true,
+                "probability": 0.9473684210526315,
+                "message": "運動FIM≥51：研究内の歩行自立者18/19名（94.7%）。原著の分類は歩行自立。患者個人の予測確率や獲得不能の判定ではありません。"
+              },
+              {
+                "id": "siasLow",
+                "field": "",
+                "fieldLabel": "",
+                "operator": "boolean",
+                "isLeaf": true,
+                "isPositive": false,
+                "probability": 0,
+                "message": "運動FIM20〜30・非麻痺側SIAS≤3：研究内の歩行自立者0/25名（0.0%）。原著の分類は歩行非自立。患者個人の予測確率や獲得不能の判定ではありません。"
+              },
+              {
+                "id": "siasHigh",
+                "field": "",
+                "fieldLabel": "",
+                "operator": "boolean",
+                "isLeaf": true,
+                "isPositive": false,
+                "probability": 0.5,
+                "message": "運動FIM20〜30・非麻痺側SIAS≥4：研究内の歩行自立者7/14名（50.0%）。自立・非自立が同数のため、原著の規則では非自立に分類。患者個人の予測確率や獲得不能の判定ではありません。"
+              },
+              {
+                "id": "trunkLow",
+                "field": "",
+                "fieldLabel": "",
+                "operator": "boolean",
+                "isLeaf": true,
+                "isPositive": false,
+                "probability": 0.23076923076923078,
+                "message": "運動FIM31〜50・TCT≤87：研究内の歩行自立者3/13名（23.1%）。原著の分類は歩行非自立。患者個人の予測確率や獲得不能の判定ではありません。"
+              },
+              {
+                "id": "trunkHigh",
+                "field": "",
+                "fieldLabel": "",
+                "operator": "boolean",
+                "isLeaf": true,
+                "isPositive": true,
+                "probability": 0.7307692307692307,
+                "message": "運動FIM31〜50・TCT≥88：研究内の歩行自立者19/26名（73.1%）。原著の分類は歩行自立。患者個人の予測確率や獲得不能の判定ではありません。"
+              }
+            ],
+            "notes": "対象：西堀病院の回復期リハビリテーション病棟に2020年10月〜2024年3月に入棟した脳卒中片麻痺患者196名（男性102、女性94、平均77.7歳）。脳梗塞・脳内出血、必要な評価が可能で退院までリハを継続した患者。意識障害・重い高次脳機能障害で評価困難、急変・死亡・転院、欠測を除外。入棟1週以内の評価から退院時FIM歩行≥6を検討。発症から入棟平均36.7日、在院平均120.9日。運動FIMを≤19／20〜30／31〜50／≥51の4群に分け、20〜30では非麻痺側SIAS≥4、31〜50ではFACT≥12またはTCT≥88で分岐する。非麻痺側SIASは大腿四頭筋筋力と握力の合計（0〜6）で、麻痺側下肢SIAS（0〜15）や膝伸展筋力Nm/kgで代用しない。終端は多数決、同数は非自立とする原著の規則を保持。0/99や0/25という研究内頻度を将来の歩行自立確率0%に変換しない。FACT版・TCT版は同一196名の代替モデルであり、いずれも有効な参考結果として照合するが、支持／困難の集計には加えない。単施設後ろ向き・10分割内部交差検証のみ、外部検証なし。TCT版：学習データ正解率90.8%、10分割交差検証正解率83.2%。群別正解率（自立78.7%・非自立94.6%）は学習データであり、交差検証の感度・特異度として登録しない。抄録のAUC0.968（FACT）・0.971（TCT）は補助解析のロジスティック回帰の値で、決定木のAUCではない。回帰の切片未掲載につき確率計算モデルは作らない。",
+            "timeline": {
+              "version": 1,
+              "anchor": "stroke_onset",
+              "kind": "future",
+              "evaluation": {
+                "value": 36.7,
+                "unit": "day",
+                "precision": "mean",
+                "originalText": "Within one week of admission; mean 36.7 days from onset to admission",
+                "basis": "Methods p.25、Results p.26。入棟時平均であり、1週の評価窓を発症起点の固定範囲には変換しない。"
+              },
+              "target": {
+                "value": null,
+                "unit": "day",
+                "precision": "unknown",
+                "originalText": "At discharge from inpatient rehabilitation",
+                "basis": "退院時。個人ごとに異なるため固定日・適用日数範囲を設定しない。"
+              }
+            },
+            "evidenceReview": {
+              "status": "checked",
+              "sourceUrl": "https://doi.org/10.11336/jjcrs.17.24",
+              "location": "Methods pp.25–26、Figure 2 p.28、Results pp.26–28、Limitations p.31",
+              "reason": "図の全6終端と境界・人数を目視照合。同数の非自立分類を保持し、回帰AUCを決定木へ転用しない。",
+              "reviewedAt": "2026-11-11",
+              "revision": "stroke-walking-primary-source-2026-11-11-v1"
+            },
+            "study": {
+              "year": 2026,
+              "doi": "10.11336/jjcrs.17.24",
+              "cohortGroup": "murakami-2026-196",
+              "sampleSize": 196,
+              "model": "TCT",
+              "outcome": "discharge_FIM_walking_ge_6",
+              "validation": "ten_fold_internal_cross_validation",
+              "resubstitutionAccuracy": 0.908,
+              "crossValidatedAccuracy": 0.832,
+              "supplementaryLogisticAUC": 0.971,
+              "consensusReason": "同一集団の代替モデル2件を独立した文献2票として加算しないため参考結果。"
+            }
+          },
+          "accuracy": 0.832,
+          "sensitivity": null,
+          "specificity": null,
+          "auc": null,
+          "consensusEligible": 0,
+          "isActive": 1,
+          "sortOrder": 55,
+          "createdAt": "2026-11-11T10:39:21.438Z",
+          "updatedAt": "2026-11-11T10:39:21.438Z"
         }
       ]
     }

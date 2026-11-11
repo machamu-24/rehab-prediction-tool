@@ -1,26 +1,39 @@
-**Node.js・MySQLの個別導入が不要なデスクトップ版になりました。**
+**歩行関連4文献・7ルールを追加したv2.1.0です。** 互換性を保った追加のため、v2.0からのマイナー更新としています。
+
+### 追加した文献と入力項目
+
+- Jenkinら（2021）：入院時BBSによる退院時10m歩行自立。
+- Kimら（2026）：入院時BBSの全体・脳梗塞・脳出血別カットオフ。
+- Sato・Ogawaら（2025）：入院時FACTによる退院時歩行自立。
+- Murakamiら（2026）：運動FIM・非麻痺側SIASとFACT／TCTを用いる2種類の決定木。
+- 入院時FACT、TCT、非麻痺側SIAS、片側性障害、10m歩行の入力欄を追加。点数範囲・欠測・入院時と現在値の区別も検証します。
+- 同じ研究のモデルを重複集計しないよう、Kimらの全体モデルとMurakamiらの2モデルは有効な「参考結果」として表示します。群別割合を個人の予測確率として表示しません。
+
+[出典・適用条件・登録内容の詳細](https://github.com/machamu-24/rehab-prediction-tool/blob/v2.1.0/docs/STROKE_WALKING_2026_REVIEW.md)
 
 ### ダウンロードと起動
 
 | PC | ダウンロードするファイル | 起動まで |
 | --- | --- | --- |
-| Windows（64bit・Intel/AMD） | `RehabPredict-2.0.0-Windows-x64-Setup.exe` | インストーラーを実行し、アイコンを開く |
-| Apple Silicon Mac | `RehabPredict-2.0.0-macOS-arm64.dmg` | appをApplicationsへコピーして開く |
-| Intel Mac | `RehabPredict-2.0.0-macOS-x64.dmg` | appをApplicationsへコピーして開く |
+| Windows（64bit・Intel/AMD） | `RehabPredict-2.1.0-Windows-x64-Setup.exe` | インストーラーを実行し、アイコンを開く |
+| Apple Silicon Mac | `RehabPredict-2.1.0-macOS-arm64.dmg` | appをApplicationsへコピーして開く |
+| Intel Mac | `RehabPredict-2.1.0-macOS-x64.dmg` | appをApplicationsへコピーして開く |
 
-初回起動時にSQLiteのデータベースと文献を自動準備します。DB接続設定・管理パスワード・ビルド作業は不要です。[導入・移行・バックアップの手順](https://github.com/machamu-24/rehab-prediction-tool/blob/main/docs/RELEASE_GUIDE.md)
+**Node.js・MySQLの個別導入は不要です。** 初回起動時にSQLiteと文献データを自動準備します。[導入・移行・バックアップの手順](https://github.com/machamu-24/rehab-prediction-tool/blob/v2.1.0/docs/RELEASE_GUIDE.md)
 
-### 文献とデータ
+### 文献と既存データ
 
-- 2026-11-10に最新の通常版DBから書き出した **7アウトカム・23文献ルール**を同梱。式・係数・条件・時間軸・出典URL・有効／無効状態を引き継ぎます。
-- **新規利用時の照合履歴・個別結果は0件**。症例入力・実績・メモ・接続情報・バックアップを配布物に含みません。
-- SQLiteは各PCの利用者データ領域に保存。アプリの更新・再インストールで文献や履歴を初期化しません。
-- 「接続・バックアップ」からJSONの保存・検証・復元を操作できます。復元前は自動バックアップし、新しいDBファイルへ復元します。旧MySQL版のJSONバックアップも取り込めます。元のMySQL DBは変更しません。
+- 新規利用は **7アウトカム・30文献ルール**、照合履歴・個別結果0件から開始します。症例入力・実績・メモ・接続情報・バックアップは配布物に含みません。
+- SQLiteは各PCの利用者データ領域に保存し、アプリ更新で既存の文献・履歴を初期化しません。
+- 既存のDBは同梱データで自動置換しません。v2.0から更新しただけでは新しい7ルールは既存DBに自動追加されないため、文献管理からの追加が必要です。開発者向けにはバックアップ・重複確認付きの追加スクリプトも用意しています。
+- 静的デモにも同じ7ルールを追加し、従来の定義を保持します。デモは配布版と従来から収録件数が異なります。
 
 ### 動作確認
 
-Windows x64・Mac arm64・Mac x64の実際のインストーラーから起動し、初期文献・履歴0件、文献編集、照合保存、CSV、バックアップ復元、再起動後の保持を検証しています。Windowsはインストーラーの再実行後も保持することを確認します。検証結果は `INSTALLER_TESTS.json`、配布ファイルのSHA-256は `SHA256SUMS.txt` に添付しています。
+閾値・決定木全分岐・適用条件・入力範囲・既存履歴の保持・再登録時の重複防止・途中失敗時のロールバックを自動テストで確認しています。
+
+GitHub ActionsでWindows x64・Mac arm64・Mac x64のインストーラーを作成し、実アプリの新規起動、照合保存、文献編集、バックアップ復元、再起動後の保持を確認した配布物を公開します。`INSTALLER_TESTS.json`に検証結果、`SHA256SUMS.txt`に配布ファイルのチェックサムを添付します。
 
 ### 署名について
 
-この版はWindowsの発行元署名とAppleのDeveloper ID署名・公証が未設定です。Mac版はアドホック署名です。初回にOSの発行元確認が表示される場合があり、組織のPC設定によっては管理者の許可が必要です。署名・公証なしで確認操作まで不要にできることは保証していません。
+Windowsの発行元署名とAppleのDeveloper ID署名・公証は未設定です。Mac版はアドホック署名のため、初回にOSの発行元確認が表示される場合があります。
