@@ -5,6 +5,7 @@ import { evaluateRule, extractRequiredFieldsFromDef, runEngine } from "./ruleEng
 import { validateRuleDefinition, applyConditionSchema } from "../shared/ruleValidation";
 import { patientInputsSchema } from "../shared/patientValidation";
 import { getPatientScoreRange } from "../shared/patientScoreRanges";
+import { commonPatientInputField } from "../shared/patientInputAliases";
 import { PATIENT_FIELDS, getVisiblePatientSections } from "../client/src/lib/patientFields";
 
 const rules = createStrokeWalkingRules(1).map((rule: object, i: number) => ({ ...rule, id: 71000 + i })) as LiteratureRule[];
@@ -35,7 +36,7 @@ describe("4文献・7歩行ルールの原著に基づく登録", () => {
     expect(evaluate(jenkin, { admission_bbs_score: 14 }).isPositive).toBe(true);
     expect(evaluate(jenkin).prediction).toContain("10m");
     for (const patch of [
-      { admission_independent_10m: true }, { admission_unilateral_impairment: false },
+      { admission_independent_10m: true }, { hemiparesis_present: false },
       { admission_age: 17 }, { admission_ward_type: "急性期病棟" }, { stroke_type: "くも膜下出血" },
     ]) expect(evaluate(jenkin, patch).status).toBe("outside");
     const { admission_independent_10m, ...missing } = inputs;
@@ -112,7 +113,7 @@ describe("4文献・7歩行ルールの原著に基づく登録", () => {
   it("必要な全入力が画面にあり、FACT・TCT・SIASの点数範囲・整数・型を検証する", () => {
     const required = new Set(rules.flatMap(rule => [...extractRequiredFieldsFromDef(rule.ruleDefinition), ...rule.applyConditions.map(c => c.field)]));
     const visible = getVisiblePatientSections(required, false).flatMap(section => section.fields.map(field => field.key));
-    for (const field of required) expect(visible).toContain(field);
+    for (const field of required) expect(visible).toContain(commonPatientInputField(field));
     for (const [field, max] of [["admission_fact_score", 20], ["admission_tct_score", 100], ["admission_sias_nonparetic", 6]] as const) {
       expect(getPatientScoreRange(field)).toEqual({ min: 0, max });
       expect(PATIENT_FIELDS.flatMap(s => s.fields).find(f => f.key === field)?.type).toBe("number");

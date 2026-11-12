@@ -152,6 +152,8 @@ import {
   getVisiblePatientSections,
   type FieldDef,
 } from "@/lib/patientFields";
+import { admissionSharedInputs, initiallyLinkAdmissionDays, switchAdmissionPhase } from "@/lib/admissionSharedInputs";
+import { commonPatientInputField, COMMON_HEMIPARESIS_FIELD, LEGACY_UNILATERAL_FIELD } from "@shared/patientInputAliases";
 import {
   ASSESSMENT_PHASES,
   assessmentSchema,
@@ -803,6 +805,7 @@ export default function PredictPage() {
   const [assessmentPhase, setAssessmentPhase] =
     useState<keyof typeof ASSESSMENT_PHASES>("admission");
   const [timeContext, setTimeContext] = useState<TimeQuery>({ kind: "future" });
+  const [admissionDaysLinked, setAdmissionDaysLinked] = useState(true);
   const [showAllFields, setShowAllFields] = useState(false);
   const utils = trpc.useUtils();
   const [summaryScrollRequest, setSummaryScrollRequest] = useState(0);
@@ -824,9 +827,11 @@ export default function PredictPage() {
     { outcomeId: selectedOutcomeId ?? undefined },
     { enabled: selectedOutcomeId !== null }
   );
+  const daySynchronizationEnabled = !isDemoMode && !usesKoyamaTimeAxis(availableRules);
+  const admissionInputs = admissionSharedInputs(enteredInputs, timeContext, assessmentPhase, admissionDaysLinked && daySynchronizationEnabled);
   const inputs = hasKoyamaTimeAxis(availableRules)
-    ? koyamaSharedInputs(enteredInputs, timeContext)
-    : withCalculatedFimTotals(enteredInputs);
+    ? koyamaSharedInputs(admissionInputs, timeContext)
+    : withCalculatedFimTotals(admissionInputs);
   const currentInputKey = JSON.stringify({
     outcomeId: selectedOutcomeId,
     inputs,
@@ -852,7 +857,7 @@ export default function PredictPage() {
     PATIENT_FIELDS.flatMap(section => section.fields.map(field => field.key))
   );
   const unknownFields: FieldDef[] = Array.from(displayedFields)
-    .filter(field => !knownFields.has(field))
+    .filter(field => !knownFields.has(field) && commonPatientInputField(field) === field)
     .map(key => savedFieldDefinitions.get(key) ?? ({ key, label: savedFieldName(key), type: typeof enteredInputs[key] === "boolean" ? "boolean" : typeof enteredInputs[key] === "string" && enteredInputs[key] !== "" && !Number.isFinite(Number(enteredInputs[key])) ? "text" : "number" }));
   if (unknownFields.length)
     visibleSections.push({
@@ -865,6 +870,7 @@ export default function PredictPage() {
       sessionStorage.setItem("rehab-local-draft-v2", JSON.stringify({
         ...JSON.parse(currentInputKey),
         inputs: enteredInputs,
+        admissionDaysLinked,
         reuseContext,
       }));
       toast.success("このタブに下書きを保存しました（タブを閉じるまで保持）");
@@ -898,6 +904,7 @@ export default function PredictPage() {
       );
       const restoredInputs = omitInvalidPatientScores(draft.inputs);
       setInputs(restoredInputs as PatientInputs);
+      setAdmissionDaysLinked(typeof draft.admissionDaysLinked === "boolean" ? draft.admissionDaysLinked : initiallyLinkAdmissionDays(restoredInputs as PatientInputs, draft.timeContext ? timeQuerySchema.parse(draft.timeContext) : { kind: "future" }));
       setReuseContext(readReuseContext(draft.reuseContext));
       setReuseWarnings([]);
       setSelectedOutcomeId(outcomes ? resolvePredictionOutcomeId(draft.outcomeId, outcomes) : draft.outcomeId);
@@ -984,7 +991,31 @@ export default function PredictPage() {
     key: string,
     value: string | number | boolean | undefined
   ) => {
-    setInputs(prev => ({ ...prev, [key]: value }));
+    if (key === "days_onset_to_admission" && assessmentPhase === "admission" && daySynchronizationEnabled)
+      setAdmissionDaysLinked(false);
+    setInputs(prev => {
+      const next = { ...prev, [key]: value };
+      if (key === COMMON_HEMIPARESIS_FIELD) delete next[LEGACY_UNILATERAL_FIELD];
+      return next;
+    });
+  };
+
+  const handleTimeContextChange = (query: TimeQuery) => {
+    if (assessmentPhase === "admission" && admissionDaysLinked && daySynchronizationEnabled && !query.evaluation)
+      setInputs(previous => {
+        const next = { ...previous };
+        delete next.days_onset_to_admission;
+        return next;
+      });
+    setTimeContext(query);
+  };
+
+  const handleAssessmentPhaseChange = (next: keyof typeof ASSESSMENT_PHASES) => {
+    const shared = switchAdmissionPhase(enteredInputs, timeContext, assessmentPhase, next, admissionDaysLinked && daySynchronizationEnabled);
+    setInputs(shared.inputs);
+    setTimeContext(shared.timeContext);
+    setAdmissionDaysLinked(shared.linked);
+    setAssessmentPhase(next);
   };
 
   const handleReset = () => {
@@ -995,6 +1026,7 @@ export default function PredictPage() {
     setReuseError("");
     setInputs({});
     setTimeContext({ kind: "future" });
+    setAdmissionDaysLinked(true);
     setCaseId("");
     setAssessedOn(new Date().toLocaleDateString("en-CA"));
     setAssessmentPhase("admission");
@@ -1016,6 +1048,7 @@ export default function PredictPage() {
     setAssessedOn(preset.assessedOn);
     setAssessmentPhase(preset.assessmentPhase);
     setTimeContext(preset.timeContext);
+    setAdmissionDaysLinked(initiallyLinkAdmissionDays(preset.inputs, preset.timeContext));
     setResult(null);
     setEvaluatedInputKey("");
     setSavedPredictionId(null);
@@ -1030,6 +1063,7 @@ export default function PredictPage() {
     setAssessedOn(prepared.assessedOn);
     setAssessmentPhase(prepared.assessmentPhase);
     setTimeContext(prepared.timeContext);
+    setAdmissionDaysLinked(initiallyLinkAdmissionDays(prepared.inputs, prepared.timeContext));
     setSelectedOutcomeId(resolvedOutcomeId);
     setReuseContext({ record: structuredClone(record), mode });
     setReuseWarnings([...prepared.warnings,
@@ -1237,7 +1271,7 @@ export default function PredictPage() {
                   className="w-full h-9 rounded-md border px-2 bg-background"
                   value={assessmentPhase}
                   onChange={e =>
-                    setAssessmentPhase(
+                    handleAssessmentPhaseChange(
                       e.target.value as keyof typeof ASSESSMENT_PHASES
                     )
                   }
@@ -1254,7 +1288,7 @@ export default function PredictPage() {
                   {!usesKoyamaTimeAxis(availableRules) && (
                     <TimeQueryEditor
                       value={timeContext}
-                      onChange={setTimeContext}
+                      onChange={handleTimeContextChange}
                     />
                   )}
                   {hasKoyamaTimeAxis(availableRules) && (
@@ -1331,7 +1365,7 @@ export default function PredictPage() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setAssessmentPhase(requiredPhase)}
+                      onClick={() => handleAssessmentPhaseChange(requiredPhase)}
                     >
                       {ASSESSMENT_PHASES[requiredPhase]}の評価に切り替える
                     </Button>
@@ -1413,6 +1447,19 @@ export default function PredictPage() {
                       )}
                     </div>
                     <FimTotalCalculation inputs={inputs} field={field.key} />
+                    {field.key === "days_onset_to_admission" && assessmentPhase === "admission" && daySynchronizationEnabled && (
+                      <p className="text-xs text-muted-foreground">
+                        {admissionDaysLinked ? (
+                          <>上部の「評価値を測定した時点」から自動反映します。測定日と入院日が異なる場合は、ここで調整できます。</>
+                        ) : (
+                          <>この欄の個別入力を使用しています。
+                            <button type="button" className="ml-1 underline underline-offset-2" onClick={() => setAdmissionDaysLinked(true)}>
+                              測定時点との連動に戻す
+                            </button>
+                          </>
+                        )}
+                      </p>
+                    )}
                     {field.description && (
                       <p
                         id={`patient-help-${field.key}`}

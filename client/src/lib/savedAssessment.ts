@@ -23,6 +23,7 @@ export type ReuseContext = { record: SavedAssessment; mode: ReuseMode };
 export type FormInputs = Record<string, string | number | boolean | undefined>;
 
 const extras: FieldDef[] = [
+  { key: "admission_unilateral_impairment", label: "入院時 片側性の機能障害（旧入力）", type: "boolean", booleanLabels: { true: "片側性", false: "両側性・その他" } },
   { key: "nihss", label: "NIHSS", type: "number", unit: "点" },
   {
     key: "motricity_index_lower",

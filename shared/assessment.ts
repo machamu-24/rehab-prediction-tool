@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const ENGINE_VERSION = "local-2026.11.11-v1";
+export const ENGINE_VERSION = "local-2026.11.12-v1";
 export const ASSESSMENT_PHASES = {
   admission: "入院時",
   week3: "入棟3週間後",

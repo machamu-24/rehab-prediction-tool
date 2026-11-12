@@ -9,6 +9,7 @@ import {
   type LiteratureTimeline,
 } from "../shared/literatureTimeline";
 import { patientInputsSchema } from "../shared/patientValidation";
+import { commonPatientInputField, LEGACY_UNILATERAL_FIELD, UNILATERAL_PROXY_NOTE, withWalkingEligibilityInputs } from "../shared/patientInputAliases";
 import { koyamaInputReason, koyamaResultTimeline, matchKoyamaTime } from "../shared/koyama";
 /**
  * 文献ベースルールエンジン
@@ -379,7 +380,8 @@ function buildLiteratureSummary(
       textOrNull(metadata.description) ?? buildFallbackOverview(rule, def),
     targetPopulation,
     predictors: extractPredictorLabels(def),
-    clinicalNote,
+    clinicalNote: rule.applyConditions?.some(condition => condition.field === LEGACY_UNILATERAL_FIELD)
+      ? [clinicalNote, UNILATERAL_PROXY_NOTE].filter(Boolean).join("\n") : clinicalNote,
   };
 }
 
@@ -804,6 +806,7 @@ export function evaluateRule(
       throw new Error(
         `入力値を確認してください: ${validation.error.issues.map(issue => issue.path.join(".")).join(", ")}`
       );
+    inputs = withWalkingEligibilityInputs(inputs);
     const def = rule.ruleDefinition;
     const reference = readNomogramReference(def);
     if (rule.ruleType === "nomogram" && reference)
@@ -863,7 +866,7 @@ export function evaluateRule(
       return makeInapplicable(rule, literatureSummary, reason, "outside");
     const missingConditions = conditions
       .filter(c => !available.includes(c))
-      .map(c => c.field);
+      .map(c => commonPatientInputField(c.field));
     if (missingConditions.length)
       throw new MissingInputError(Array.from(new Set(missingConditions)));
     // Decision trees only need inputs along the path actually taken.
